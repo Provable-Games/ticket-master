@@ -1,0 +1,14 @@
+target
+.snfoundry_cache/
+snfoundry_trace/
+coverage/
+profile/
+.snfoundry_cache/
+snfoundry_trace/
+coverage/
+profile/
+deployments/
+.env
+.cache/
+.env.mainnet
+.env.sepolia

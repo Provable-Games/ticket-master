@@ -1,0 +1,89 @@
+name: lint and test
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "ui/**"
+      - "**/manifest.json"
+      - "pnpm-lock.yaml"
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "ui/**"
+      - "**/manifest.json"
+      - ".github/**"
+      - "pnpm-lock.yaml"
+
+jobs:
+  lint_and_test:
+    name: lint and test contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract scarb version
+        run: |
+          SCARB_VERSION=$(grep '^scarb' .tool-versions | awk '{print $2}')
+          echo "SCARB_VERSION=$SCARB_VERSION" >> "$GITHUB_ENV"
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: ${{ env.SCARB_VERSION }}
+
+      - name: Extract foundry version
+        run: |
+          FOUNDRY_VERSION=$(grep '^starknet-foundry' .tool-versions | awk '{print $2}')
+          echo "FOUNDRY_VERSION=$FOUNDRY_VERSION" >> "$GITHUB_ENV"
+
+      - uses: foundry-rs/setup-snfoundry@v4
+        with:
+          starknet-foundry-version: ${{ env.FOUNDRY_VERSION }}
+
+      # Cache scarb dependencies
+      - name: Cache Scarb dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/scarb
+            target/
+          key: ${{ runner.os }}-scarb-${{ hashFiles('**/Scarb.toml', '**/Scarb.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-scarb-
+
+      # Cache tool installations
+      - name: Cache tools
+        uses: actions/cache@v4
+        id: cache-tools
+        with:
+          path: |
+            ~/.local/bin/cairo-coverage
+            ~/.local/bin/universal-sierra-compiler
+          key: ${{ runner.os }}-tools-cairo-coverage-universal-sierra-compiler-v1
+          restore-keys: |
+            ${{ runner.os }}-tools-
+
+      # Install tools in parallel if not cached
+      - name: Install tools
+        if: steps.cache-tools.outputs.cache-hit != 'true'
+        run: |
+          # Run installations in parallel
+          (curl -L https://raw.githubusercontent.com/software-mansion/cairo-coverage/main/scripts/install.sh | sh) &
+          (curl -L https://raw.githubusercontent.com/software-mansion/universal-sierra-compiler/master/scripts/install.sh | sh) &
+          # Wait for all background jobs to complete
+          wait
+
+      - name: Cairo lint
+        run: scarb fmt --check --workspace
+
+      # Run tests once with both fuzzing and coverage
+      - name: Run tests with fuzzing and coverage
+        run: snforge test --coverage --fuzzer-runs 500
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.lcov
+          token: ${{ secrets.CODECOV_TOKEN }}
