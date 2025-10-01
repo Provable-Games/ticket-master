@@ -1,9 +1,9 @@
 # TicketMaster
 
-TicketMaster leverages Ekubo's TWAMM extension to deliver demand-based, market-rate pricing for Dungeon Tickets. Delivered as an extension to OpenZeppelin
-ERC20 component, this system provides a stateful flow that automates TWAMM pool initialization, order creation, and distribution of proceeds. The contract now
-monitors a three-day average price feed and can temporarily throttle issuance when the market trades below a configured threshold, resuming once conditions
-recover.
+TicketMaster leverages Ekubo's TWAMM extension to deliver demand-based, market-rate pricing for Dungeon Tickets. Built as an extension to OpenZeppelin's
+ERC20 component, this system provides a stateful flow that automates TWAMM pool initialization, order creation, and distribution of proceeds. The contract
+monitors Ekubo's on-chain oracle price feed over a configurable lookback period and can temporarily throttle issuance when the market trades below a
+configured threshold, resuming once conditions recover.
 
 ## Repository Layout
 
@@ -66,8 +66,9 @@ constructor(
 - Defers pool ticks and seed liquidity to owner-only bootstrap calls so deployment-time pricing can
   be computed off-chain after the contract address is known
 - Validates and caches issuance throttling configuration: a Q128 price threshold (`issuance_reduction_price_x128`),
-  a lookback duration in seconds (`issuance_reduction_price_duration`), and a basis-point reduction
-  (`issuance_reduction_bips`) that controls how much the distribution rate decreases when prices fall below the threshold
+  a lookback duration in seconds (`issuance_reduction_price_duration`, owner-configurable post-deployment), and a
+  basis-point reduction (`issuance_reduction_bips`) that controls how much the distribution rate decreases when
+  Ekubo's on-chain oracle reports prices below the threshold
 - Accepts `buyback_order_config` to configure buyback TWAMM order constraints (min/max delay, min/max duration, fee)
 - Aligns both optional start and mandatory end times to Ekubo's TWAMM bucket size; the current start
   time is tracked separately so restarts and throttling can reuse the most recent activation point
@@ -117,12 +118,13 @@ and prevent invalid TWAMM order configurations.
 The contract implements dynamic issuance throttling that responds to market conditions:
 
 - `enable_low_issuance_mode()` checks the average price over the configured lookback period (specified by
-  `issuance_reduction_price_duration` in seconds) returned by the Ekubo oracle. When the average price drops
-  below the configured Q128 threshold (`issuance_reduction_price_x128`), the function reduces the active
-  distribution sale rate by `issuance_reduction_bips` (basis points) and holds the reclaimed tokens on the contract.
+  `issuance_reduction_price_duration` in seconds, owner-configurable) returned by Ekubo's on-chain oracle.
+  When the average price drops below the configured Q128 threshold (`issuance_reduction_price_x128`), the
+  function reduces the active distribution sale rate by `issuance_reduction_bips` (basis points) and holds
+  the reclaimed tokens on the contract.
 - `disable_low_issuance_mode()` performs the inverse operation: once the average price climbs back above
-  the threshold over the same lookback period, the stored tokens are re-supplied to the TWAMM position and
-  the original sale rate is restored.
+  the threshold over the same lookback period (querying Ekubo's on-chain oracle), the stored tokens are
+  re-supplied to the TWAMM position and the original sale rate is restored.
 - The contract exposes `is_low_issuance_mode()`, `get_low_issuance_returned_tokens()`,
   `get_issuance_reduction_price_x128()`, `get_issuance_reduction_price_duration()`, and
   `get_issuance_reduction_bips()` so off-chain monitoring can track throttle state and configuration.
