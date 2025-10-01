@@ -36,7 +36,6 @@ constructor(
     name: ByteArray,
     symbol: ByteArray,
     total_supply: u128,
-    buyback_pool_fee: u128,
     distribution_pool_fee: u128,
     payment_token: ContractAddress,
     buyback_token: ContractAddress,
@@ -48,11 +47,13 @@ constructor(
     oracle_address: ContractAddress,
     velords_address: ContractAddress,
     issuance_reduction_price_x128: u256,
+    issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
     treasury_address: ContractAddress,
     recipients: Array<ContractAddress>,
     amounts: Array<u256>,
     distribution_end_time: u64,
+    buyback_order_config: BuybackOrderConfig,
 )
 ```
 
@@ -64,54 +65,89 @@ constructor(
   distribution and buyback legs
 - Defers pool ticks and seed liquidity to owner-only bootstrap calls so deployment-time pricing can
   be computed off-chain after the contract address is known
-- Validates and caches issuance throttling configuration: a Q128 price threshold and a basis-point
-  reduction that can be invoked when prices fall
+- Validates and caches issuance throttling configuration: a Q128 price threshold (`issuance_reduction_price_x128`),
+  a lookback duration in seconds (`issuance_reduction_price_duration`), and a basis-point reduction
+  (`issuance_reduction_bips`) that controls how much the distribution rate decreases when prices fall below the threshold
+- Accepts `buyback_order_config` to configure buyback TWAMM order constraints (min/max delay, min/max duration, fee)
 - Aligns both optional start and mandatory end times to Ekubo's TWAMM bucket size; the current start
   time is tracked separately so restarts and throttling can reuse the most recent activation point
 - `deployment_state` starts at `0`; time metadata is populated later by TWAMM calls
 
 ### Pool Bootstrap Flow
 
-1. **Initialize Distribution Pool** – `init_distribution_pool(distribution_tick)` (owner-only) stores the
-   caller-provided tick, invokes `ICore.initialize_pool`, and records the resulting pool identifier
-2. **Seed Liquidity** – `provide_initial_liquidity(payment_amount, dungeon_amount, min_liquidity)`
-   (owner-only) transfers the payment token from the caller, mints dungeon tickets directly to the
-   positions contract, and calls `mint_and_deposit_and_clear_both` with symmetric bounds
-3. **Start Distribution** – `start_token_distribution()` mints the cached distribution supply to
-   positions and opens a TWAMM order via `mint_and_increase_sell_amount`. The requested end time is
-   aligned with `utils::get_buyback_endtime` and capped by `utils::get_max_twamm_duration()`
-4. **Recycle Proceeds** – `claim_proceeds()` withdraws realized sales from the distribution order for
-   treasury routing, while `claim_and_distribute_buybacks(limit)` walks matured buyback orders and
-   forwards their proceeds to veLords once their end-time has elapsed
+The contract follows a strict four-phase deployment sequence:
+
+1. **Initialize Distribution Pool** – `init_distribution_pool(distribution_tick)` (owner-only)
+   - Takes the distribution pool's initial tick as a parameter (must be computed off-chain after contract deployment)
+   - Invokes Ekubo Core's `initialize_pool` to create the distribution pool
+   - Caches the resulting pool identifier and advances state to `1 (DistributionPoolInitialized)`
+
+2. **Seed Initial Liquidity** – `provide_initial_liquidity(payment_amount, dungeon_amount, min_liquidity)` (owner-only)
+   - Transfers `payment_amount` of payment tokens from the caller to the contract
+   - Mints `dungeon_amount` of dungeon tickets directly to Ekubo Positions contract
+   - Calls Ekubo's `mint_and_deposit_and_clear_both` with symmetric bounds to establish the initial liquidity position
+   - Validates that the resulting liquidity meets the `min_liquidity` threshold
+   - Advances state to `2 (LiquidityProvided)`
+
+3. **Start Token Distribution** – `start_token_distribution()` (callable by anyone once liquidity is provided)
+   - Mints the remaining distribution supply (`tokens_for_distribution`) to Ekubo Positions
+   - Opens a TWAMM sell order via `mint_and_increase_sell_amount`
+   - Aligns the end time using `utils::get_buyback_endtime` and caps it with `utils::get_max_twamm_duration()`
+   - Caches the position NFT token ID and advances state to `3 (DistributionStarted)`
+
+4. **Recycle Proceeds** – Ongoing operations after distribution starts:
+   - `claim_proceeds()`: Withdraws realized payment token sales from the distribution TWAMM order, then splits proceeds 80% to treasury and 20% for buybacks
+   - `distribute_proceeds()`: Creates a new TWAMM buyback order using the accumulated 20% share, converting payment tokens back to buyback tokens over time
+   - `claim_and_distribute_buybacks(limit)`: Iterates through matured buyback orders, withdrawing completed buyback tokens and forwarding them to the veLords address
+
+### Buyback Order Configuration
+
+The constructor accepts a `BuybackOrderConfig` structure that defines constraints for buyback TWAMM orders created
+during proceeds distribution. This configuration includes:
+
+- `min_delay` / `max_delay`: Valid time window (in seconds) between claiming proceeds and when the buyback order can start
+- `min_duration` / `max_duration`: Valid duration range (in seconds) for the buyback order execution
+- `fee`: The pool fee tier to use for buyback orders (encoded as a Q128 value)
+
+These constraints ensure buyback orders are created with parameters that match the protocol's operational requirements
+and prevent invalid TWAMM order configurations.
 
 ### Issuance Reduction Guard
 
-- `enable_low_issuance_mode()` checks the three-day average price returned by the Ekubo oracle. When it
-  drops below the configured Q128 threshold, the function reduces the active distribution sale rate
-  by `issuance_reduction_bips` and holds the reclaimed tokens on the contract.
+The contract implements dynamic issuance throttling that responds to market conditions:
+
+- `enable_low_issuance_mode()` checks the average price over the configured lookback period (specified by
+  `issuance_reduction_price_duration` in seconds) returned by the Ekubo oracle. When the average price drops
+  below the configured Q128 threshold (`issuance_reduction_price_x128`), the function reduces the active
+  distribution sale rate by `issuance_reduction_bips` (basis points) and holds the reclaimed tokens on the contract.
 - `disable_low_issuance_mode()` performs the inverse operation: once the average price climbs back above
-  the threshold, the stored tokens are re-supplied to the TWAMM position and the original sale rate is
-  restored.
-- The contract exposes `is_low_issuance_mode()`, `get_low_issuance_returned_tokens()`, and
-  `get_issuance_reduction_price_x128()` so off-chain monitoring can track throttle state.
+  the threshold over the same lookback period, the stored tokens are re-supplied to the TWAMM position and
+  the original sale rate is restored.
+- The contract exposes `is_low_issuance_mode()`, `get_low_issuance_returned_tokens()`,
+  `get_issuance_reduction_price_x128()`, `get_issuance_reduction_price_duration()`, and
+  `get_issuance_reduction_bips()` so off-chain monitoring can track throttle state and configuration.
+
+This mechanism protects against oversupply during unfavorable market conditions while maintaining flexibility to
+resume normal distribution rates when conditions improve.
 
 ### Public Interface Highlights
 
 The on-chain interface (`ITicketMaster`) exposes:
 
-- Lifecycle actions: `init_distribution_pool`, `provide_initial_liquidity`, `start_token_distribution`,
+- **Lifecycle actions**: `init_distribution_pool`, `provide_initial_liquidity`, `start_token_distribution`,
   `claim_proceeds`, `claim_and_distribute_buybacks`, `distribute_proceeds`,
   `enable_low_issuance_mode`, `disable_low_issuance_mode`
-- Pool & order metadata: `get_distribution_pool_key`, `get_distribution_pool_key_hash`,
-  `get_distribution_order_key`, `get_pool_id`, `get_buyback_pool_fee`,
+- **Pool & order metadata**: `get_distribution_pool_key`, `get_distribution_pool_key_hash`,
+  `get_distribution_order_key`, `get_pool_id`, `get_distribution_fee`, `get_buyback_order_config`,
   `get_position_token_id`
-- Distribution telemetry: `get_token_distribution_rate`,
+- **Distribution telemetry**: `get_token_distribution_rate`, `get_tokens_for_distribution`,
   `get_distribution_end_time`, `get_distribution_initial_tick`, `get_lords_price_x128`,
   `get_dungeon_ticket_price_x128`, `get_survivor_price_x128`
-- Issuance controls: `is_low_issuance_mode`, `get_low_issuance_returned_tokens`,
-  `get_issuance_reduction_price_x128`
-- Administrative controls: `set_treasury_address`, `set_velords_address`, `withdraw_position_token`
-- Deployment helpers: `get_deployed_at`, `get_payment_token`, `get_buyback_token`,
+- **Issuance controls**: `is_low_issuance_mode`, `get_low_issuance_returned_tokens`,
+  `get_issuance_reduction_price_x128`, `get_issuance_reduction_price_duration`, `get_issuance_reduction_bips`
+- **Administrative controls**: `set_treasury_address`, `set_velords_address`, `set_issuance_reduction_price_duration`,
+  `withdraw_position_token`, `withdraw_funds`
+- **Deployment helpers**: `get_deployed_at`, `get_payment_token`, `get_buyback_token`,
   `get_extension_address`, `get_core_dispatcher`, `get_positions_dispatcher`,
   `get_registry_dispatcher`, `get_oracle_address`, `get_velords_address`, `get_treasury_address`,
   `is_pool_initialized`, `get_deployment_state`
@@ -190,17 +226,15 @@ scarb fmt
 
 ## Security Considerations
 
-- State machine guards prevent re-entry into lifecycle phases out of order
-- All external addresses are validated against the zero address during construction
-- Distribution supply is only minted when the TWAMM order is opened, preventing stranded balances
-- Time alignment clamps distribution windows and enforces Ekubo's maximum duration
-- Issuance throttling enforces the configured oracle price floor and validates the basis-point
-  reduction before mutating the distribution rate
-- The owner can reclaim the distribution position NFT with `withdraw_position_token`,
-  ensuring custody can be revoked if automated execution must halt
-- The 20% veLords revenue share ships with a constructor-provided address that the owner can
-  rotate post-deployment via `set_velords_address`
-- Registry registration is part of deployment, ensuring the token metadata is discoverable
+- **State machine guards**: Prevent re-entry into lifecycle phases out of order through strict `deployment_state` assertions
+- **Address validation**: All external addresses (tokens, Ekubo contracts, treasury, veLords) are validated against the zero address during construction
+- **Distribution supply protection**: Distribution supply is only minted when the TWAMM order is opened, preventing stranded balances
+- **Time alignment**: Clamps distribution windows and enforces Ekubo's maximum duration to prevent invalid TWAMM operations
+- **Issuance throttling safeguards**: Validates the configured oracle price floor, lookback duration, and basis-point reduction before mutating the distribution rate. Ensures reduction bips are less than `BIPS_BASIS` (10000) to prevent arithmetic errors
+- **Emergency controls**: The owner can reclaim the distribution position NFT with `withdraw_position_token`, ensuring custody can be revoked if automated execution must halt. The owner can also use `withdraw_funds` to recover any ERC20 tokens from the contract
+- **Administrative flexibility**: The owner can adjust `issuance_reduction_price_duration` via `set_issuance_reduction_price_duration` to tune the oracle lookback period without redeployment
+- **Revenue distribution**: The 20% veLords revenue share ships with a constructor-provided address that the owner can rotate post-deployment via `set_velords_address`. Treasury address can similarly be updated via `set_treasury_address`
+- **Registry integration**: Token registration with Ekubo's registry is part of deployment, ensuring the token metadata is discoverable on-chain
 
 ## Contributing
 
