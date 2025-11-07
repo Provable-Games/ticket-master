@@ -3,6 +3,7 @@ use core::result::ResultTrait;
 use core::traits::{Into, TryInto};
 use openzeppelin_access::ownable::interface::{IOwnableDispatcher, IOwnableDispatcherTrait};
 use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
+use openzeppelin_token::erc721::interface::{IERC721Dispatcher, IERC721DispatcherTrait};
 use snforge_std::{
     CheatSpan, ContractClassTrait, cheat_caller_address, load, map_entry_address, mock_call,
     start_cheat_block_timestamp_global, start_cheat_caller_address, start_mock_call,
@@ -2323,51 +2324,130 @@ fn start_token_distribution_cannot_be_called_twice() {
 }
 
 #[test]
-fn transfer_distribution_position_token_moves_nft() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
+#[fork("mainnet")]
+fn withdraw_erc721_owner_fork() {
     let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
+        MAINNET_CORE_ADDRESS,
+        MAINNET_POSITIONS_ADDRESS,
+        MAINNET_POSITION_NFT_ADDRESS,
+        MAINNET_TWAMM_EXTENSION_ADDRESS,
+        MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
         MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
+        MAINNET_TREASURY,
     );
 
     ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
 
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
+    // provide ekubo position contract with approval for the payment token
+    start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    payment_token_dispatcher
+        .approve(
+            ticket_master_dispatcher.contract_address,
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000,
+        );
+    payment_token_dispatcher
+        .approve(MAINNET_POSITIONS_ADDRESS, INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000);
+    stop_cheat_caller_address(payment_token_dispatcher.contract_address);
+
+    cheat_caller_address(
+        ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
     );
-    ticket_master_dispatcher
+    let (
+        initial_liquidity_position_id, liquidity, cleared_payment_tokens, cleared_dungeon_tickets,
+    ) =
+        ticket_master_dispatcher
         .provide_initial_liquidity(
             INITIAL_LIQUIDITY_PAYMENT_TOKEN,
             INITIAL_LIQUIDITY_DUNGEON_TICKETS,
             INITIAL_LIQUIDITY_MIN_LIQUIDITY,
         );
 
-    let sale_result = (77_u64, 888_u128);
-    mock_call(MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), sale_result, 1);
+    let actual_distribution_end_time = ticket_master_dispatcher.get_distribution_end_time();
+    let end_time_delta = if actual_distribution_end_time > DISTRIBUTION_END_TIME {
+        actual_distribution_end_time - DISTRIBUTION_END_TIME
+    } else {
+        DISTRIBUTION_END_TIME - actual_distribution_end_time
+    };
+    // Step 4: Start distribution
+    let (position_token_id, _) = ticket_master_dispatcher.start_token_distribution();
 
-    ticket_master_dispatcher.start_token_distribution();
+    // change caller to ticket master owner
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
 
-    let recipient: ContractAddress = 'position_guardian'.try_into().unwrap();
-    mock_call(MOCK_POSITION_NFT_ADDRESS, selector!("transfer_from"), (), 1);
+    // withdraw ERC721 token
+    ticket_master_dispatcher
+        .withdraw_erc721(MAINNET_POSITION_NFT_ADDRESS, position_token_id.into());
 
-    ticket_master_dispatcher.withdraw_position_token(recipient);
+    // verify token ownership is now the deployer address
+    let nft_dispatcher = IERC721Dispatcher { contract_address: MAINNET_POSITION_NFT_ADDRESS };
+    assert_eq!(nft_dispatcher.owner_of(position_token_id.into()), DEPLOYER_ADDRESS);
+}
 
-    assert_eq!(ticket_master_dispatcher.get_position_token_id(), 0_u64);
+#[test]
+#[fork("mainnet")]
+#[should_panic(expected: ('Caller is not the owner',))]
+fn withdraw_erc721_not_owner_fork() {
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MAINNET_CORE_ADDRESS,
+        MAINNET_POSITIONS_ADDRESS,
+        MAINNET_POSITION_NFT_ADDRESS,
+        MAINNET_TWAMM_EXTENSION_ADDRESS,
+        MAINNET_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MAINNET_TREASURY,
+    );
+
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+
+    // provide ekubo position contract with approval for the payment token
+    start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    payment_token_dispatcher
+        .approve(
+            ticket_master_dispatcher.contract_address,
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000,
+        );
+    payment_token_dispatcher
+        .approve(MAINNET_POSITIONS_ADDRESS, INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000);
+    stop_cheat_caller_address(payment_token_dispatcher.contract_address);
+
+    cheat_caller_address(
+        ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
+    );
+    let (
+        initial_liquidity_position_id, liquidity, cleared_payment_tokens, cleared_dungeon_tickets,
+    ) =
+        ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+
+    let actual_distribution_end_time = ticket_master_dispatcher.get_distribution_end_time();
+    let end_time_delta = if actual_distribution_end_time > DISTRIBUTION_END_TIME {
+        actual_distribution_end_time - DISTRIBUTION_END_TIME
+    } else {
+        DISTRIBUTION_END_TIME - actual_distribution_end_time
+    };
+    // Step 4: Start distribution
+    let (position_token_id, _) = ticket_master_dispatcher.start_token_distribution();
+
+    // change caller address to non-owner
+    start_cheat_caller_address(
+        ticket_master_dispatcher.contract_address, 'NON_OWNER'.try_into().unwrap(),
+    );
+
+    // try to withdraw ERC721 token
+    ticket_master_dispatcher
+        .withdraw_erc721(MAINNET_POSITION_NFT_ADDRESS, position_token_id.into());
 }
 
 #[test]
@@ -2416,75 +2496,7 @@ fn transfer_distribution_position_token_requires_owner() {
         ticket_master_dispatcher.contract_address, intruder, CheatSpan::TargetCalls(1),
     );
 
-    ticket_master_dispatcher.withdraw_position_token(intruder);
-}
-
-#[test]
-#[should_panic(expected: 'distribution not started')]
-fn withdraw_position_token_rejects_when_position_token_id_zero() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // position_token_id is 0 because we haven't called start_token_distribution
-    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
-    ticket_master_dispatcher.withdraw_position_token(recipient);
-}
-
-#[test]
-#[should_panic(expected: 'invalid recipient')]
-fn withdraw_position_token_rejects_zero_recipient() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-
-    let sale_result = (77_u64, 888_u128);
-    mock_call(MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), sale_result, 1);
-
-    ticket_master_dispatcher.start_token_distribution();
-
-    ticket_master_dispatcher.withdraw_position_token(ZERO_ADDRESS);
+    ticket_master_dispatcher.withdraw_erc721(MOCK_POSITION_NFT_ADDRESS, 1_u256);
 }
 
 #[test]
@@ -3543,7 +3555,7 @@ fn set_velords_address_succeeds() {
 
 #[test]
 #[should_panic(expected: ('Caller is not the owner',))]
-fn withdraw_funds_rejects_non_owner() {
+fn withdraw_erc20_rejects_non_owner() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     let NON_OWNER_ADDRESS: ContractAddress = 'non_owner'.try_into().unwrap();
 
@@ -3563,12 +3575,12 @@ fn withdraw_funds_rejects_non_owner() {
 
     // Try to withdraw funds as non-owner
     start_cheat_caller_address(ticket_master_dispatcher.contract_address, NON_OWNER_ADDRESS);
-    ticket_master_dispatcher.withdraw_funds(payment_token_dispatcher.contract_address, 1000_u256);
+    ticket_master_dispatcher.withdraw_erc20(payment_token_dispatcher.contract_address, 1000_u256);
     stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
 }
 
 #[test]
-fn withdraw_funds_succeeds_for_owner() {
+fn withdraw_erc20_succeeds_for_owner() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
     let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
@@ -3602,7 +3614,7 @@ fn withdraw_funds_succeeds_for_owner() {
     // Withdraw funds as owner
     let amount_to_withdraw = 3000_u256;
     ticket_master_dispatcher
-        .withdraw_funds(payment_token_dispatcher.contract_address, amount_to_withdraw);
+        .withdraw_erc20(payment_token_dispatcher.contract_address, amount_to_withdraw);
 
     // Verify contract balance decreased
     let contract_balance_after = payment_token_dispatcher
@@ -3615,7 +3627,7 @@ fn withdraw_funds_succeeds_for_owner() {
 }
 
 #[test]
-fn withdraw_funds_can_withdraw_full_balance() {
+fn withdraw_erc20_can_withdraw_full_balance() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
     let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
@@ -3640,7 +3652,7 @@ fn withdraw_funds_can_withdraw_full_balance() {
 
     // Withdraw entire balance
     ticket_master_dispatcher
-        .withdraw_funds(payment_token_dispatcher.contract_address, amount_to_deposit);
+        .withdraw_erc20(payment_token_dispatcher.contract_address, amount_to_deposit);
 
     // Verify contract balance is zero
     let contract_balance_after = payment_token_dispatcher
@@ -6113,8 +6125,7 @@ fn mainnet_full() {
     cheat_caller_address(
         ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
     );
-    let (initial_liquidity_position_id, liquidity, _, cleared_dungeon_tickets) =
-        ticket_master_dispatcher
+    let (initial_liquidity_position_id, liquidity, _, _) = ticket_master_dispatcher
         .provide_initial_liquidity(
             INITIAL_LIQUIDITY_PAYMENT_TOKEN,
             INITIAL_LIQUIDITY_DUNGEON_TICKETS,

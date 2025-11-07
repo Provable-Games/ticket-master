@@ -30,8 +30,8 @@ pub trait ITicketMaster<TContractState> {
     fn set_issuance_reduction_bips(ref self: TContractState, bips: u128);
     fn set_treasury_address(ref self: TContractState, treasury_address: ContractAddress);
     fn set_velords_address(ref self: TContractState, velords_address: ContractAddress);
-    fn withdraw_position_token(ref self: TContractState, recipient: ContractAddress);
-    fn withdraw_funds(ref self: TContractState, token_address: ContractAddress, amount: u256);
+    fn withdraw_erc20(ref self: TContractState, token_address: ContractAddress, amount: u256);
+    fn withdraw_erc721(ref self: TContractState, token_address: ContractAddress, token_id: u256);
     fn get_token_distribution_rate(self: @TContractState) -> u128;
     fn get_buyback_rate(self: @TContractState) -> u128;
     fn get_buyback_order_key_counter(self: @TContractState) -> u128;
