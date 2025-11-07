@@ -2355,10 +2355,8 @@ fn withdraw_erc721_owner_fork() {
     cheat_caller_address(
         ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
     );
-    let (
-        initial_liquidity_position_id, liquidity, cleared_payment_tokens, cleared_dungeon_tickets,
-    ) =
-        ticket_master_dispatcher
+
+    ticket_master_dispatcher
         .provide_initial_liquidity(
             INITIAL_LIQUIDITY_PAYMENT_TOKEN,
             INITIAL_LIQUIDITY_DUNGEON_TICKETS,
@@ -2413,10 +2411,8 @@ fn withdraw_erc721_not_owner_fork() {
     cheat_caller_address(
         ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
     );
-    let (
-        initial_liquidity_position_id, liquidity, cleared_payment_tokens, cleared_dungeon_tickets,
-    ) =
-        ticket_master_dispatcher
+
+    ticket_master_dispatcher
         .provide_initial_liquidity(
             INITIAL_LIQUIDITY_PAYMENT_TOKEN,
             INITIAL_LIQUIDITY_DUNGEON_TICKETS,
