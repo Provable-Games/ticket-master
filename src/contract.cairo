@@ -610,12 +610,18 @@ pub mod TicketMaster {
             self.velords_address.write(velords_address);
         }
 
+        /// @notice Withdraws ERC20 tokens from the contract
+        /// @param token_address The address of the ERC20 token
+        /// @param amount The amount of tokens to withdraw
         fn withdraw_erc20(ref self: ContractState, token_address: ContractAddress, amount: u256) {
             self.ownable.assert_only_owner();
             let token = IERC20Dispatcher { contract_address: token_address };
             token.transfer(self.ownable.Ownable_owner.read(), amount);
         }
 
+        /// @notice Withdraws ERC721 tokens from the contract
+        /// @param token_address The address of the ERC721 token
+        /// @param token_id The ID of the token to withdraw
         fn withdraw_erc721(
             ref self: ContractState, token_address: ContractAddress, token_id: u256,
         ) {
