@@ -2451,55 +2451,6 @@ fn withdraw_erc721_not_owner_fork() {
 }
 
 #[test]
-#[should_panic]
-fn transfer_distribution_position_token_requires_owner() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-
-    let sale_result = (77_u64, 888_u128);
-    mock_call(MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), sale_result, 1);
-
-    ticket_master_dispatcher.start_token_distribution();
-
-    let intruder: ContractAddress = 'intruder'.try_into().unwrap();
-    cheat_caller_address(
-        ticket_master_dispatcher.contract_address, intruder, CheatSpan::TargetCalls(1),
-    );
-
-    ticket_master_dispatcher.withdraw_erc721(MOCK_POSITION_NFT_ADDRESS, 1_u256);
-}
-
-#[test]
 #[should_panic(expected: ('Distribution not started',))]
 fn claim_proceeds_before_pool_initialized() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
