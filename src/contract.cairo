@@ -610,30 +610,25 @@ pub mod TicketMaster {
             self.velords_address.write(velords_address);
         }
 
-        /// @notice Transfers custody of the distribution position NFT to a new address
-        /// @param recipient The address that will receive the NFT
-        fn withdraw_position_token(ref self: ContractState, recipient: ContractAddress) {
-            self.ownable.assert_only_owner();
-            let zero_address: ContractAddress = 0.try_into().unwrap();
-            assert(recipient != zero_address, Errors::INVALID_RECIPIENT);
-
-            let position_token_id = self.position_token_id.read();
-            assert(position_token_id != 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
-
-            let nft_dispatcher = IERC721Dispatcher {
-                contract_address: self.position_nft_address.read(),
-            };
-
-            nft_dispatcher
-                .transfer_from(get_contract_address(), recipient, position_token_id.into());
-
-            self.position_token_id.write(0);
-        }
-
-        fn withdraw_funds(ref self: ContractState, token_address: ContractAddress, amount: u256) {
+        /// @notice Withdraws ERC20 tokens from the contract
+        /// @param token_address The address of the ERC20 token
+        /// @param amount The amount of tokens to withdraw
+        fn withdraw_erc20(ref self: ContractState, token_address: ContractAddress, amount: u256) {
             self.ownable.assert_only_owner();
             let token = IERC20Dispatcher { contract_address: token_address };
             token.transfer(self.ownable.Ownable_owner.read(), amount);
+        }
+
+        /// @notice Withdraws ERC721 tokens from the contract
+        /// @param token_address The address of the ERC721 token
+        /// @param token_id The ID of the token to withdraw
+        fn withdraw_erc721(
+            ref self: ContractState, token_address: ContractAddress, token_id: u256,
+        ) {
+            self.ownable.assert_only_owner();
+            let token = IERC721Dispatcher { contract_address: token_address };
+            token
+                .transfer_from(get_contract_address(), self.ownable.Ownable_owner.read(), token_id);
         }
 
         /// @notice Burns tokens from the caller's balance
