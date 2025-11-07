@@ -2342,7 +2342,6 @@ fn withdraw_erc721_owner_fork() {
 
     ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
 
-    // provide ekubo position contract with approval for the payment token
     start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
     payment_token_dispatcher
         .approve(
@@ -2366,13 +2365,6 @@ fn withdraw_erc721_owner_fork() {
             INITIAL_LIQUIDITY_MIN_LIQUIDITY,
         );
 
-    let actual_distribution_end_time = ticket_master_dispatcher.get_distribution_end_time();
-    let end_time_delta = if actual_distribution_end_time > DISTRIBUTION_END_TIME {
-        actual_distribution_end_time - DISTRIBUTION_END_TIME
-    } else {
-        DISTRIBUTION_END_TIME - actual_distribution_end_time
-    };
-    // Step 4: Start distribution
     let (position_token_id, _) = ticket_master_dispatcher.start_token_distribution();
 
     // change caller to ticket master owner
@@ -2431,13 +2423,6 @@ fn withdraw_erc721_not_owner_fork() {
             INITIAL_LIQUIDITY_MIN_LIQUIDITY,
         );
 
-    let actual_distribution_end_time = ticket_master_dispatcher.get_distribution_end_time();
-    let end_time_delta = if actual_distribution_end_time > DISTRIBUTION_END_TIME {
-        actual_distribution_end_time - DISTRIBUTION_END_TIME
-    } else {
-        DISTRIBUTION_END_TIME - actual_distribution_end_time
-    };
-    // Step 4: Start distribution
     let (position_token_id, _) = ticket_master_dispatcher.start_token_distribution();
 
     // change caller address to non-owner
