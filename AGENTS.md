@@ -34,7 +34,6 @@
 - Constructor now also accepts the veLords revenue recipient address; deployment tooling and tests must thread this parameter and leverage `set_velords_address` for post-deploy rotations.
 - Constructor now also requires the address of the position NFT contract; make sure helpers and deployment scripts thread this through whenever the positions deployment differs from the NFT address.
 - `init_distribution_pool` now accepts a single distribution tick (owner-only), persists it, and returns the pool identifier; `provide_initial_liquidity` likewise takes payment/dungeon/minimum amounts and is owner-only. Deployment tooling should derive the distribution tick after the contract address is known and pass the liquidity values to this step.
-- Owners can reclaim the distribution position NFT via `withdraw_position_token`, which clears the stored `position_token_id`; update tests if ownership semantics change.
 - proceeds distribution splits payment token balances 20/80 between the stored veLords address and TWAMM buybacks; use the new setter when rotating recipients.
 
 ## Commit & Pull Request Guidelines
