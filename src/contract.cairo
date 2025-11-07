@@ -56,6 +56,7 @@ pub mod TicketMaster {
         pub distribution_end_time: u64,
         pub distribution_pool_fee: u128,
         pub distribution_initial_tick: i129,
+        pub liquidity_position_id: u64,
         pub low_issuance_mode_active: bool,
         pub extension_address: ContractAddress,
         pub payment_token: ContractAddress,
@@ -286,6 +287,9 @@ pub mod TicketMaster {
             let tokens_for_distribution = self.tokens_for_distribution.read();
             let remaining_supply = tokens_for_distribution - dungeon_ticket_amount_u256;
             self.tokens_for_distribution.write(remaining_supply);
+
+            // store liquidity position id
+            self.liquidity_position_id.write(position_id);
 
             // Return the position ID and cleared amounts
             (position_id, liquidity, cleared_payment, cleared_our)
@@ -712,6 +716,12 @@ pub mod TicketMaster {
             _get_position_token_id(self)
         }
 
+        /// @notice Returns the ID of the liquidity position
+        /// @return u64 The ID of the liquidity position
+        fn get_liquidity_position_id(self: @ContractState) -> u64 {
+            _get_liquidity_position_id(self)
+        }
+
         /// @notice Returns the address of the payment token
         /// @return ContractAddress The address of the payment token
         fn get_payment_token(self: @ContractState) -> ContractAddress {
@@ -901,6 +911,11 @@ pub mod TicketMaster {
     #[inline(always)]
     fn _get_position_token_id(self: @ContractState) -> u64 {
         self.position_token_id.read()
+    }
+
+    #[inline(always)]
+    fn _get_liquidity_position_id(self: @ContractState) -> u64 {
+        self.liquidity_position_id.read()
     }
 
     #[inline(always)]

@@ -6100,6 +6100,51 @@ fn mainnet_full() {
 }
 
 #[test]
+#[fork("mainnet")]
+fn test_get_liquidity_position_id_matches_provide_initial_liquidity() {
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MAINNET_CORE_ADDRESS,
+        MAINNET_POSITIONS_ADDRESS,
+        MAINNET_POSITION_NFT_ADDRESS,
+        MAINNET_TWAMM_EXTENSION_ADDRESS,
+        MAINNET_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MAINNET_TREASURY,
+    );
+
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+
+    start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    payment_token_dispatcher
+        .approve(
+            ticket_master_dispatcher.contract_address,
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000,
+        );
+    payment_token_dispatcher
+        .approve(MAINNET_POSITIONS_ADDRESS, INITIAL_LIQUIDITY_PAYMENT_TOKEN.into() * 1000);
+    stop_cheat_caller_address(payment_token_dispatcher.contract_address);
+
+    cheat_caller_address(
+        ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS, CheatSpan::TargetCalls(1),
+    );
+    let (position_id, _, _, _) = ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+
+    let stored_position_id = ticket_master_dispatcher.get_liquidity_position_id();
+    assert_eq!(
+        position_id, stored_position_id, "liquidity position id mismatch after initial liquidity",
+    );
+}
+
+#[test]
 fn mock_simple_flow() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 

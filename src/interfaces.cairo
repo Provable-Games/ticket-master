@@ -50,6 +50,7 @@ pub trait ITicketMaster<TContractState> {
     fn get_buyback_order_config(self: @TContractState) -> BuybackOrderConfig;
     fn get_pool_id(self: @TContractState) -> u256;
     fn get_position_token_id(self: @TContractState) -> u64;
+    fn get_liquidity_position_id(self: @TContractState) -> u64;
     fn get_payment_token(self: @TContractState) -> ContractAddress;
     fn get_extension_address(self: @TContractState) -> ContractAddress;
     fn get_buyback_token(self: @TContractState) -> ContractAddress;
