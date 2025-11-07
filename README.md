@@ -79,11 +79,13 @@ constructor(
 The contract follows a strict four-phase deployment sequence:
 
 1. **Initialize Distribution Pool** – `init_distribution_pool(distribution_tick)` (owner-only)
+
    - Takes the distribution pool's initial tick as a parameter (must be computed off-chain after contract deployment)
    - Invokes Ekubo Core's `initialize_pool` to create the distribution pool
    - Caches the resulting pool identifier and advances state to `1 (DistributionPoolInitialized)`
 
 2. **Seed Initial Liquidity** – `provide_initial_liquidity(payment_amount, dungeon_amount, min_liquidity)` (owner-only)
+
    - Transfers `payment_amount` of payment tokens from the caller to the contract
    - Mints `dungeon_amount` of dungeon tickets directly to Ekubo Positions contract
    - Calls Ekubo's `mint_and_deposit_and_clear_both` with symmetric bounds to establish the initial liquidity position
@@ -91,6 +93,7 @@ The contract follows a strict four-phase deployment sequence:
    - Advances state to `2 (LiquidityProvided)`
 
 3. **Start Token Distribution** – `start_token_distribution()` (callable by anyone once liquidity is provided)
+
    - Mints the remaining distribution supply (`tokens_for_distribution`) to Ekubo Positions
    - Opens a TWAMM sell order via `mint_and_increase_sell_amount`
    - Aligns the end time using `utils::get_buyback_endtime` and caps it with `utils::get_max_twamm_duration()`
@@ -148,7 +151,7 @@ The on-chain interface (`ITicketMaster`) exposes:
 - **Issuance controls**: `is_low_issuance_mode`, `get_low_issuance_returned_tokens`,
   `get_issuance_reduction_price_x128`, `get_issuance_reduction_price_duration`, `get_issuance_reduction_bips`
 - **Administrative controls**: `set_treasury_address`, `set_velords_address`, `set_issuance_reduction_price_duration`,
-  `withdraw_position_token`, `withdraw_funds`
+  `withdraw_erc721`, `withdraw_erc20`
 - **Deployment helpers**: `get_deployed_at`, `get_payment_token`, `get_buyback_token`,
   `get_extension_address`, `get_core_dispatcher`, `get_positions_dispatcher`,
   `get_registry_dispatcher`, `get_oracle_address`, `get_velords_address`, `get_treasury_address`,
@@ -233,7 +236,7 @@ scarb fmt
 - **Distribution supply protection**: Distribution supply is only minted when the TWAMM order is opened, preventing stranded balances
 - **Time alignment**: Clamps distribution windows and enforces Ekubo's maximum duration to prevent invalid TWAMM operations
 - **Issuance throttling safeguards**: Validates the configured oracle price floor, lookback duration, and basis-point reduction before mutating the distribution rate. Ensures reduction bips are less than `BIPS_BASIS` (10000) to prevent arithmetic errors
-- **Emergency controls**: The owner can reclaim the distribution position NFT with `withdraw_position_token`, ensuring custody can be revoked if automated execution must halt. The owner can also use `withdraw_funds` to recover any ERC20 tokens from the contract
+- **Emergency controls**: The owner can use `withdraw_erc20` and `withdraw_erc721` to recover any ERC20 or ERC721 tokens from the contract
 - **Administrative flexibility**: The owner can adjust `issuance_reduction_price_duration` via `set_issuance_reduction_price_duration` to tune the oracle lookback period without redeployment
 - **Revenue distribution**: The 20% veLords revenue share ships with a constructor-provided address that the owner can rotate post-deployment via `set_velords_address`. Treasury address can similarly be updated via `set_treasury_address`
 - **Registry integration**: Token registration with Ekubo's registry is part of deployment, ensuring the token metadata is discoverable on-chain

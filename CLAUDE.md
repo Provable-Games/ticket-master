@@ -158,8 +158,6 @@ The contract implements sophisticated time alignment for TWAMM compatibility:
 - Access control via deployment state checks
 - Reentrancy protection through checks-effects-interactions
 - Integer overflow protection via Cairo's built-in safety
-- Owner-only `withdraw_position_token` allows emergency recovery of the TWAMM position
-  NFT and clears the cached token id so automated flows halt once custody changes
 
 ### Deployment Flow
 
