@@ -480,86 +480,32 @@ pub mod TicketMaster {
             (total_proceeds, order_number)
         }
 
+        /// @notice Forces the enabling of low issuance mode
+        /// @dev Only callable by the owner
+        fn force_enable_low_issuance_mode(ref self: ContractState) -> u128 {
+            self.ownable.assert_only_owner();
+            _enable_low_issuance_mode(ref self)
+        }
+
         /// @notice Reduces ticket issuance rate when pricing falls below set threshold
+        /// @dev Only callable when the low issuance criteria are met
         fn enable_low_issuance_mode(ref self: ContractState) -> u128 {
-            assert(self.deployment_state.read() == 3, Errors::DISTRIBUTION_NOT_STARTED);
-            assert(self.position_token_id.read() != 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
-            assert(!self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_ALREADY_ACTIVE);
+            _assert_enable_low_issuance_criteria_met(@self);
+            _enable_low_issuance_mode(ref self)
+        }
 
-            let reduction_price = self.issuance_reduction_price_x128.read();
-            assert(reduction_price > 0, Errors::REDUCTION_PRICE_NOT_SET);
-
-            let reduction_bips = self.issuance_reduction_bips.read();
-            assert(reduction_bips > 0, Errors::REDUCTION_BIPS_NOT_SET);
-
-            let reduction_duration = self.issuance_reduction_price_duration.read();
-            assert(reduction_duration > 0, Errors::REDUCTION_DURATION_NOT_SET);
-
-            let average_price = _get_dungeon_ticket_price_x128(@self, reduction_duration);
-            assert(average_price < reduction_price, Errors::PRICE_NOT_BELOW_REDUCTION_THRESHOLD);
-
-            let current_rate = self.token_distribution_rate.read();
-            assert(current_rate > 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
-
-            let rate_delta = (current_rate * reduction_bips) / BIPS_BASIS;
-            assert(rate_delta > 0, Errors::REDUCTION_RATE_TOO_SMALL);
-            assert(rate_delta <= current_rate, Errors::REDUCTION_RATE_TOO_LARGE);
-
-            let positions_dispatcher = self.positions_dispatcher.read();
-            let position_token_id = self.position_token_id.read();
-            let order_key = _get_distribution_order_key(@self);
-
-            let returned_tokens = positions_dispatcher
-                .decrease_sale_rate_to_self(position_token_id, order_key, rate_delta);
-            assert(returned_tokens > 0, Errors::LOW_ISSUANCE_TOKENS_MISSING);
-
-            self.token_distribution_rate.write(current_rate - rate_delta);
-            self.low_issuance_mode_active.write(true);
-
-            returned_tokens
+        /// @notice Forces the disabling of low issuance mode
+        /// @dev Only callable by the owner
+        fn force_disable_low_issuance_mode(ref self: ContractState) -> u128 {
+            self.ownable.assert_only_owner();
+            _disable_low_issuance_mode(ref self)
         }
 
         /// @notice Restores the ticket issuance rate when pricing conditions recover
-        fn disable_low_issuance_mode(ref self: ContractState) {
-            assert(self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_NOT_ACTIVE);
-
-            let reduction_price = self.issuance_reduction_price_x128.read();
-            assert(reduction_price > 0, Errors::REDUCTION_PRICE_NOT_SET);
-
-            let reduction_duration = self.issuance_reduction_price_duration.read();
-            assert(reduction_duration > 0, Errors::REDUCTION_DURATION_NOT_SET);
-
-            let average_price = _get_dungeon_ticket_price_x128(@self, reduction_duration);
-            assert(average_price > reduction_price, Errors::PRICE_NOT_ABOVE_REDUCTION_THRESHOLD);
-
-            // get all dungeon tickets in the contract
-            let tickets_in_contract = self.erc20.balance_of(get_contract_address());
-            assert(tickets_in_contract > 0, Errors::NO_TICKETS_AVAILABLE);
-
-            // transfer available tickets to positions contract
-            let positions_dispatcher = self.positions_dispatcher.read();
-            self
-                .erc20
-                ._transfer(
-                    get_contract_address(),
-                    positions_dispatcher.contract_address,
-                    tickets_in_contract,
-                );
-
-            // increase the sale rate of the position token
-            let previous_order_key = _get_distribution_order_key(@self);
-            let position_token_id = self.position_token_id.read();
-            let sale_rate_increase = positions_dispatcher
-                .increase_sell_amount(
-                    position_token_id, previous_order_key, tickets_in_contract.try_into().unwrap(),
-                );
-
-            // update the token distribution rate
-            let current_rate = self.token_distribution_rate.read();
-            self.token_distribution_rate.write(current_rate + sale_rate_increase);
-
-            // disable low issuance mode
-            self.low_issuance_mode_active.write(false);
+        /// @dev Only callable when the low issuance criteria are met
+        fn disable_low_issuance_mode(ref self: ContractState) -> u128 {
+            _assert_disable_low_issuance_criteria_met(@self);
+            _disable_low_issuance_mode(ref self)
         }
 
         /// @notice Sets the reduction duration for the low issuance mode
@@ -976,6 +922,104 @@ pub mod TicketMaster {
     #[inline(always)]
     fn _is_low_issuance_mode_active(self: @ContractState) -> bool {
         self.low_issuance_mode_active.read()
+    }
+
+    #[inline(always)]
+    fn _enable_low_issuance_criteria_met(self: @ContractState) -> bool {
+        let reduction_price = self.issuance_reduction_price_x128.read();
+        assert(reduction_price > 0, Errors::REDUCTION_PRICE_NOT_SET);
+
+        let reduction_duration = self.issuance_reduction_price_duration.read();
+        assert(reduction_duration > 0, Errors::REDUCTION_DURATION_NOT_SET);
+
+        let average_price = _get_dungeon_ticket_price_x128(self, reduction_duration);
+        average_price < reduction_price
+    }
+
+    #[inline(always)]
+    fn _assert_enable_low_issuance_criteria_met(self: @ContractState) {
+        assert(_enable_low_issuance_criteria_met(self), Errors::LOW_ISSUANCE_CRITERIA_NOT_MET);
+    }
+
+    #[inline(always)]
+    fn _enable_low_issuance_mode(ref self: ContractState) -> u128 {
+        assert(self.deployment_state.read() == 3, Errors::DISTRIBUTION_NOT_STARTED);
+        assert(self.position_token_id.read() != 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
+        assert(!self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_ALREADY_ACTIVE);
+
+        let reduction_bips = self.issuance_reduction_bips.read();
+        assert(reduction_bips > 0, Errors::REDUCTION_BIPS_NOT_SET);
+
+        let current_rate = self.token_distribution_rate.read();
+        assert(current_rate > 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
+
+        let rate_delta = (current_rate * reduction_bips) / BIPS_BASIS;
+        assert(rate_delta > 0, Errors::REDUCTION_RATE_TOO_SMALL);
+        assert(rate_delta <= current_rate, Errors::REDUCTION_RATE_TOO_LARGE);
+
+        let positions_dispatcher = self.positions_dispatcher.read();
+        let position_token_id = self.position_token_id.read();
+        let order_key = _get_distribution_order_key(@self);
+        let returned_tokens = positions_dispatcher
+            .decrease_sale_rate_to_self(position_token_id, order_key, rate_delta);
+
+        assert(returned_tokens > 0, Errors::LOW_ISSUANCE_TOKENS_MISSING);
+
+        self.token_distribution_rate.write(current_rate - rate_delta);
+        self.low_issuance_mode_active.write(true);
+
+        returned_tokens
+    }
+
+    fn _disable_low_issuance_mode_criteria_met(self: @ContractState) -> bool {
+        assert(self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_NOT_ACTIVE);
+
+        let reduction_price = self.issuance_reduction_price_x128.read();
+        assert(reduction_price > 0, Errors::REDUCTION_PRICE_NOT_SET);
+
+        let reduction_duration = self.issuance_reduction_price_duration.read();
+        assert(reduction_duration > 0, Errors::REDUCTION_DURATION_NOT_SET);
+
+        let average_price = _get_dungeon_ticket_price_x128(self, reduction_duration);
+        average_price > reduction_price
+    }
+
+    fn _assert_disable_low_issuance_criteria_met(self: @ContractState) {
+        assert(
+            _disable_low_issuance_mode_criteria_met(self),
+            Errors::DISABLE_LOW_ISSUANCE_CRITERIA_NOT_MET,
+        );
+    }
+
+    fn _disable_low_issuance_mode(ref self: ContractState) -> u128 {
+        let tickets_in_contract = self.erc20.balance_of(get_contract_address());
+        assert(tickets_in_contract > 0, Errors::NO_TICKETS_AVAILABLE);
+
+        // transfer available tickets to positions contract
+        let positions_dispatcher = self.positions_dispatcher.read();
+        self
+            .erc20
+            ._transfer(
+                get_contract_address(), positions_dispatcher.contract_address, tickets_in_contract,
+            );
+
+        // increase the sale rate of the position token
+        let previous_order_key = _get_distribution_order_key(@self);
+        let position_token_id = self.position_token_id.read();
+        let sale_rate_increase = positions_dispatcher
+            .increase_sell_amount(
+                position_token_id, previous_order_key, tickets_in_contract.try_into().unwrap(),
+            );
+
+        // update the token distribution rate
+        let current_rate = self.token_distribution_rate.read();
+        let new_rate = current_rate + sale_rate_increase;
+        self.token_distribution_rate.write(new_rate);
+
+        // disable low issuance mode
+        self.low_issuance_mode_active.write(false);
+
+        new_rate
     }
 
     fn _get_dungeon_ticket_price_x128(self: @ContractState, duration: u64) -> u256 {

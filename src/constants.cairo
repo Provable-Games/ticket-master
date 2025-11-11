@@ -22,6 +22,8 @@ pub mod Errors {
     pub const NO_TICKETS_AVAILABLE: felt252 = 'no tickets available';
     pub const REDUCTION_BIPS_TOO_LARGE: felt252 = 'reduction bips too large';
     pub const REDUCTION_DURATION_NOT_SET: felt252 = 'reduction duration not set';
+    pub const LOW_ISSUANCE_CRITERIA_NOT_MET: felt252 = 'low issuance criteria not met';
+    pub const DISABLE_LOW_ISSUANCE_CRITERIA_NOT_MET: felt252 = 'disable criteria not met';
 }
 
 // Mathematical constants

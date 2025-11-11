@@ -2658,6 +2658,7 @@ fn enable_low_issuance_mode_rejects_before_distribution_started() {
         );
 
     // Try to enable low issuance mode before distribution starts (should fail)
+    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), 100_u256, 1);
     ticket_master_dispatcher.enable_low_issuance_mode();
 }
 
@@ -2703,7 +2704,7 @@ fn enable_low_issuance_mode_rejects_when_already_active() {
 
     // Enable low issuance mode once (mock price below threshold)
     let low_price: u256 = ISSUANCE_REDUCTION_PRICE_X128 - 1;
-    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), low_price, 1);
+    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), low_price, 2);
     mock_call(MOCK_POSITIONS_ADDRESS, selector!("decrease_sale_rate_to_self"), 100_u128, 1);
     ticket_master_dispatcher.enable_low_issuance_mode();
 
@@ -2712,7 +2713,7 @@ fn enable_low_issuance_mode_rejects_when_already_active() {
 }
 
 #[test]
-#[should_panic(expected: 'price not below threshold')]
+#[should_panic(expected: 'low issuance criteria not met')]
 fn enable_low_issuance_mode_rejects_when_price_not_below_threshold() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);
@@ -2760,7 +2761,7 @@ fn enable_low_issuance_mode_rejects_when_price_not_below_threshold() {
 }
 
 #[test]
-#[should_panic(expected: 'price not below threshold')]
+#[should_panic(expected: 'low issuance criteria not met')]
 fn enable_low_issuance_mode_rejects_when_price_equals_threshold() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);
@@ -2911,7 +2912,7 @@ fn disable_low_issuance_mode_rejects_when_not_active() {
 }
 
 #[test]
-#[should_panic(expected: 'price not above threshold')]
+#[should_panic(expected: 'disable criteria not met')]
 fn disable_low_issuance_mode_rejects_when_price_not_above_threshold() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);
@@ -2964,7 +2965,7 @@ fn disable_low_issuance_mode_rejects_when_price_not_above_threshold() {
 }
 
 #[test]
-#[should_panic(expected: 'price not above threshold')]
+#[should_panic(expected: 'disable criteria not met')]
 fn disable_low_issuance_mode_rejects_when_price_equals_threshold() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);

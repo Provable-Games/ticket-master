@@ -90,6 +90,7 @@ The contract follows a strict four-phase deployment sequence:
    - Mints `dungeon_amount` of dungeon tickets directly to Ekubo Positions contract
    - Calls Ekubo's `mint_and_deposit_and_clear_both` with symmetric bounds to establish the initial liquidity position
    - Validates that the resulting liquidity meets the `min_liquidity` threshold
+   - Stores the liquidity position ID for future reference
    - Advances state to `2 (LiquidityProvided)`
 
 3. **Start Token Distribution** – `start_token_distribution()` (callable by anyone once liquidity is provided)
@@ -144,7 +145,7 @@ The on-chain interface (`ITicketMaster`) exposes:
   `enable_low_issuance_mode`, `disable_low_issuance_mode`
 - **Pool & order metadata**: `get_distribution_pool_key`, `get_distribution_pool_key_hash`,
   `get_distribution_order_key`, `get_pool_id`, `get_distribution_fee`, `get_buyback_order_config`,
-  `get_position_token_id`
+  `get_position_token_id`, `get_liquidity_position_id`
 - **Distribution telemetry**: `get_token_distribution_rate`, `get_tokens_for_distribution`,
   `get_distribution_end_time`, `get_distribution_initial_tick`, `get_lords_price_x128`,
   `get_dungeon_ticket_price_x128`, `get_survivor_price_x128`
