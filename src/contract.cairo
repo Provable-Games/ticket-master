@@ -264,27 +264,25 @@ pub mod TicketMaster {
 
             // Step 1: Transfer payment tokens from caller to Ekubo's Positions contract
             let payment_token = self.payment_token.read();
-            let positions_address = self.positions_dispatcher.read().contract_address;
+            let positions_dispatcher = self.positions_dispatcher.read();
             let caller = starknet::get_caller_address();
             let payment_token_dispatcher = IERC20Dispatcher { contract_address: payment_token };
             let payment_amount_u256: u256 = payment_token_amount.into();
-            payment_token_dispatcher.transfer_from(caller, positions_address, payment_amount_u256);
+            payment_token_dispatcher
+                .transfer_from(caller, positions_dispatcher.contract_address, payment_amount_u256);
 
             // Step 2: Mint new tokens directly to Ekubo's Positions contract
-            self.erc20.mint(positions_address, dungeon_ticket_amount_u256);
+            self.erc20.mint(positions_dispatcher.contract_address, dungeon_ticket_amount_u256);
 
             // Step 3: Create new position using distribution pool key
             let pool_key = _get_distribution_pool_key(@self);
-            let (position_id, liquidity, cleared_payment, cleared_our) = self
-                .positions_dispatcher
-                .read()
+            let (position_id, liquidity, cleared_payment, cleared_our) = positions_dispatcher
                 .mint_and_deposit_and_clear_both(pool_key, TWAMM_BOUNDS, minimum_liquidity);
 
             // Transition to state 2 == liquidity provided
             self.deployment_state.write(2);
 
             // update the amount of tokens for distribution
-            let tokens_for_distribution = self.tokens_for_distribution.read();
             let remaining_supply = tokens_for_distribution - dungeon_ticket_amount_u256;
             self.tokens_for_distribution.write(remaining_supply);
 
@@ -452,6 +450,9 @@ pub mod TicketMaster {
             let positions_dispatcher = self.positions_dispatcher.read();
             let current_time = starknet::get_block_timestamp();
 
+            // get a single mutable order key
+            let mut order_key = _retrieve_buyback_order_key(@self, 0);
+
             while order_number < max_index {
                 // get the end time of the order
                 let order_key_end_time = self.buyback_order_key_end_time.read(order_number);
@@ -462,7 +463,8 @@ pub mod TicketMaster {
                     break;
                 }
 
-                let order_key = _retrieve_buyback_order_key(@self, order_key_end_time);
+                // only difference between the orders is the end time
+                order_key.end_time = order_key_end_time;
 
                 // otherwise, withdraw proceeds from the order
                 total_proceeds += positions_dispatcher
