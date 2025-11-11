@@ -2868,7 +2868,7 @@ fn enable_low_issuance_mode_succeeds_when_price_below_threshold() {
 }
 
 #[test]
-#[should_panic(expected: 'low issuance not active')]
+#[should_panic(expected: 'disable criteria not met')]
 fn disable_low_issuance_mode_rejects_when_not_active() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);
@@ -2908,6 +2908,7 @@ fn disable_low_issuance_mode_rejects_when_not_active() {
     ticket_master_dispatcher.start_token_distribution();
 
     // Try to disable when not active (should fail)
+    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), 100_u256, 1);
     ticket_master_dispatcher.disable_low_issuance_mode();
 }
 

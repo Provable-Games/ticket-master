@@ -972,8 +972,6 @@ pub mod TicketMaster {
     }
 
     fn _disable_low_issuance_mode_criteria_met(self: @ContractState) -> bool {
-        assert(self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_NOT_ACTIVE);
-
         let reduction_price = self.issuance_reduction_price_x128.read();
         assert(reduction_price > 0, Errors::REDUCTION_PRICE_NOT_SET);
 
@@ -992,6 +990,8 @@ pub mod TicketMaster {
     }
 
     fn _disable_low_issuance_mode(ref self: ContractState) -> u128 {
+        assert(self.low_issuance_mode_active.read(), Errors::LOW_ISSUANCE_NOT_ACTIVE);
+
         let tickets_in_contract = self.erc20.balance_of(get_contract_address());
         assert(tickets_in_contract > 0, Errors::NO_TICKETS_AVAILABLE);
 
