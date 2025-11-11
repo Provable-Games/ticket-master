@@ -3166,6 +3166,237 @@ fn disable_low_issuance_mode_succeeds_when_price_above_threshold() {
     assert!(!ticket_master_dispatcher.is_low_issuance_mode());
 }
 
+#[test]
+fn force_enable_low_issuance_mode_succeeds_for_owner() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    mock_ekubo_core(1_u256);
+
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+    );
+
+    // Full setup
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
+    mock_call(
+        MOCK_POSITIONS_ADDRESS,
+        selector!("mint_and_deposit_and_clear_both"),
+        (10_u64, 100_u128, 0_u256, 0_u256),
+        1,
+    );
+    ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+    mock_call(
+        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
+    );
+    ticket_master_dispatcher.start_token_distribution();
+
+    let initial_rate = ticket_master_dispatcher.get_token_distribution_rate();
+
+    // Mock decrease_sale_rate_to_self to return tokens
+    mock_call(MOCK_POSITIONS_ADDRESS, selector!("decrease_sale_rate_to_self"), 100_u128, 1);
+
+    // Force enable should succeed regardless of price (owner only)
+    let returned_tokens = ticket_master_dispatcher.force_enable_low_issuance_mode();
+
+    // Verify state changes
+    assert!(ticket_master_dispatcher.is_low_issuance_mode());
+    assert!(returned_tokens > 0);
+    assert!(ticket_master_dispatcher.get_token_distribution_rate() < initial_rate);
+}
+
+#[test]
+#[should_panic(expected: ('Caller is not the owner',))]
+fn force_enable_low_issuance_mode_rejects_non_owner() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    mock_ekubo_core(1_u256);
+
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+    );
+
+    // Full setup
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
+    mock_call(
+        MOCK_POSITIONS_ADDRESS,
+        selector!("mint_and_deposit_and_clear_both"),
+        (10_u64, 100_u128, 0_u256, 0_u256),
+        1,
+    );
+    ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+    mock_call(
+        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
+    );
+    ticket_master_dispatcher.start_token_distribution();
+
+    // Change caller to non-owner
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
+    let non_owner: ContractAddress = 'non_owner'.try_into().unwrap();
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, non_owner);
+
+    // Should panic with 'Caller is not the owner'
+    ticket_master_dispatcher.force_enable_low_issuance_mode();
+}
+
+#[test]
+fn force_disable_low_issuance_mode_succeeds_for_owner() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    mock_ekubo_core(1_u256);
+
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+    );
+
+    // Full setup
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
+    mock_call(
+        MOCK_POSITIONS_ADDRESS,
+        selector!("mint_and_deposit_and_clear_both"),
+        (10_u64, 100_u128, 0_u256, 0_u256),
+        1,
+    );
+    ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+    mock_call(
+        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
+    );
+    ticket_master_dispatcher.start_token_distribution();
+
+    // Enable low issuance mode first
+    let low_price: u256 = ISSUANCE_REDUCTION_PRICE_X128 - 1000;
+    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), low_price, 1);
+    let returned_tokens = 100_u128;
+    mock_call(MOCK_POSITIONS_ADDRESS, selector!("decrease_sale_rate_to_self"), returned_tokens, 1);
+    ticket_master_dispatcher.enable_low_issuance_mode();
+
+    // Verify it's enabled
+    assert!(ticket_master_dispatcher.is_low_issuance_mode());
+
+    // Transfer returned tokens to contract (simulating what decrease_sale_rate_to_self does)
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, MOCK_POSITIONS_ADDRESS);
+    let dungeon_ticket_dispatcher = IERC20Dispatcher {
+        contract_address: ticket_master_dispatcher.contract_address,
+    };
+    dungeon_ticket_dispatcher
+        .transfer(ticket_master_dispatcher.contract_address, returned_tokens.into());
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+
+    // Mock necessary calls for disable
+    mock_call(MOCK_POSITIONS_ADDRESS, selector!("withdraw_proceeds_from_sale_to_self"), 0_u128, 1);
+    mock_call(MOCK_POSITIONS_ADDRESS, selector!("increase_sell_amount"), returned_tokens, 1);
+
+    // Force disable should succeed regardless of price (owner only)
+    ticket_master_dispatcher.force_disable_low_issuance_mode();
+
+    // Verify it's disabled
+    assert!(!ticket_master_dispatcher.is_low_issuance_mode());
+}
+
+#[test]
+#[should_panic(expected: ('Caller is not the owner',))]
+fn force_disable_low_issuance_mode_rejects_non_owner() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    mock_ekubo_core(1_u256);
+
+    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+    );
+
+    // Full setup
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
+    mock_call(
+        MOCK_POSITIONS_ADDRESS,
+        selector!("mint_and_deposit_and_clear_both"),
+        (10_u64, 100_u128, 0_u256, 0_u256),
+        1,
+    );
+    ticket_master_dispatcher
+        .provide_initial_liquidity(
+            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
+            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
+            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
+        );
+    mock_call(
+        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
+    );
+    ticket_master_dispatcher.start_token_distribution();
+
+    // Enable low issuance mode first
+    let low_price: u256 = ISSUANCE_REDUCTION_PRICE_X128 - 1000;
+    mock_call(EKUBO_ORACLE_MAINNET, selector!("get_price_x128_over_last"), low_price, 1);
+    let returned_tokens = 100_u128;
+    mock_call(MOCK_POSITIONS_ADDRESS, selector!("decrease_sale_rate_to_self"), returned_tokens, 1);
+    ticket_master_dispatcher.enable_low_issuance_mode();
+
+    // Verify it's enabled
+    assert!(ticket_master_dispatcher.is_low_issuance_mode());
+
+    // Change caller to non-owner
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
+    let non_owner: ContractAddress = 'non_owner'.try_into().unwrap();
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, non_owner);
+
+    // Should panic with 'Caller is not the owner'
+    ticket_master_dispatcher.force_disable_low_issuance_mode();
+}
+
 // Administrative Functions Tests
 
 #[test]
