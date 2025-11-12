@@ -90,6 +90,7 @@ The contract follows a strict four-phase deployment sequence:
    - Mints `dungeon_amount` of dungeon tickets directly to Ekubo Positions contract
    - Calls Ekubo's `mint_and_deposit_and_clear_both` with symmetric bounds to establish the initial liquidity position
    - Validates that the resulting liquidity meets the `min_liquidity` threshold
+   - Stores the liquidity position ID for future reference
    - Advances state to `2 (LiquidityProvided)`
 
 3. **Start Token Distribution** – `start_token_distribution()` (callable by anyone once liquidity is provided)
@@ -100,21 +101,22 @@ The contract follows a strict four-phase deployment sequence:
    - Caches the position NFT token ID and advances state to `3 (DistributionStarted)`
 
 4. **Recycle Proceeds** – Ongoing operations after distribution starts:
-   - `claim_proceeds()`: Withdraws realized payment token sales from the distribution TWAMM order, then splits proceeds 80% to treasury and 20% for buybacks
-   - `distribute_proceeds()`: Creates a new TWAMM buyback order using the accumulated 20% share, converting payment tokens back to buyback tokens over time
-   - `claim_and_distribute_buybacks(limit)`: Iterates through matured buyback orders, withdrawing completed buyback tokens and forwarding them to the veLords address
+   - `claim_proceeds()`: Withdraws realized payment token sales from the distribution TWAMM order
+   - `distribute_proceeds(end_time)`: Splits proceeds 80% to buybacks and 20% to veLords, then creates a new TWAMM buyback order that starts immediately and runs until `end_time`
+   - `claim_and_distribute_buybacks(limit)`: Iterates through matured buyback orders, withdrawing completed buyback tokens and forwarding them to the treasury address
 
 ### Buyback Order Configuration
 
 The constructor accepts a `BuybackOrderConfig` structure that defines constraints for buyback TWAMM orders created
 during proceeds distribution. This configuration includes:
 
-- `min_delay` / `max_delay`: Valid time window (in seconds) between claiming proceeds and when the buyback order can start
+- `min_delay` / `max_delay`: *(Currently unused - buyback orders always start immediately)* Reserved for future use
 - `min_duration` / `max_duration`: Valid duration range (in seconds) for the buyback order execution
 - `fee`: The pool fee tier to use for buyback orders (encoded as a Q128 value)
 
 These constraints ensure buyback orders are created with parameters that match the protocol's operational requirements
-and prevent invalid TWAMM order configurations.
+and prevent invalid TWAMM order configurations. Note that all buyback orders start immediately (`start_time = 0`)
+upon calling `distribute_proceeds(end_time)`.
 
 ### Issuance Reduction Guard
 
@@ -124,33 +126,38 @@ The contract implements dynamic issuance throttling that responds to market cond
   `issuance_reduction_price_duration` in seconds, owner-configurable) returned by Ekubo's on-chain oracle.
   When the average price drops below the configured Q128 threshold (`issuance_reduction_price_x128`), the
   function reduces the active distribution sale rate by `issuance_reduction_bips` (basis points) and holds
-  the reclaimed tokens on the contract.
+  the reclaimed tokens on the contract. Returns the number of tokens returned from the TWAMM order.
 - `disable_low_issuance_mode()` performs the inverse operation: once the average price climbs back above
   the threshold over the same lookback period (querying Ekubo's on-chain oracle), the stored tokens are
-  re-supplied to the TWAMM position and the original sale rate is restored.
+  re-supplied to the TWAMM position and the original sale rate is restored. Returns the new distribution rate.
+- `force_enable_low_issuance_mode()` and `force_disable_low_issuance_mode()` (owner-only) allow emergency
+  override of the oracle-driven checks, enabling manual control during oracle failures or extreme market conditions.
 - The contract exposes `is_low_issuance_mode()`, `get_low_issuance_returned_tokens()`,
   `get_issuance_reduction_price_x128()`, `get_issuance_reduction_price_duration()`, and
   `get_issuance_reduction_bips()` so off-chain monitoring can track throttle state and configuration.
 
 This mechanism protects against oversupply during unfavorable market conditions while maintaining flexibility to
-resume normal distribution rates when conditions improve.
+resume normal distribution rates when conditions improve. The force functions provide emergency controls for the
+contract owner to respond to unforeseen circumstances.
 
 ### Public Interface Highlights
 
 The on-chain interface (`ITicketMaster`) exposes:
 
 - **Lifecycle actions**: `init_distribution_pool`, `provide_initial_liquidity`, `start_token_distribution`,
-  `claim_proceeds`, `claim_and_distribute_buybacks`, `distribute_proceeds`,
-  `enable_low_issuance_mode`, `disable_low_issuance_mode`
+  `claim_proceeds`, `claim_and_distribute_buybacks`, `distribute_proceeds`
+- **Issuance controls**: `enable_low_issuance_mode`, `disable_low_issuance_mode`,
+  `force_enable_low_issuance_mode`, `force_disable_low_issuance_mode`
 - **Pool & order metadata**: `get_distribution_pool_key`, `get_distribution_pool_key_hash`,
   `get_distribution_order_key`, `get_pool_id`, `get_distribution_fee`, `get_buyback_order_config`,
-  `get_position_token_id`
+  `get_position_token_id`, `get_liquidity_position_id`
 - **Distribution telemetry**: `get_token_distribution_rate`, `get_tokens_for_distribution`,
-  `get_distribution_end_time`, `get_distribution_initial_tick`, `get_lords_price_x128`,
-  `get_dungeon_ticket_price_x128`, `get_survivor_price_x128`
-- **Issuance controls**: `is_low_issuance_mode`, `get_low_issuance_returned_tokens`,
-  `get_issuance_reduction_price_x128`, `get_issuance_reduction_price_duration`, `get_issuance_reduction_bips`
-- **Administrative controls**: `set_treasury_address`, `set_velords_address`, `set_issuance_reduction_price_duration`,
+  `get_distribution_end_time`, `get_distribution_initial_tick`, `get_dungeon_ticket_price_x128`
+- **Issuance telemetry**: `is_low_issuance_mode`, `get_issuance_reduction_price_x128`,
+  `get_issuance_reduction_price_duration`, `get_issuance_reduction_bips`
+- **Administrative controls**: `set_treasury_address`, `set_velords_address`,
+  `set_issuance_reduction_price_x128`, `set_issuance_reduction_price_duration`,
+  `set_issuance_reduction_bips`, `set_buyback_order_config`,
   `withdraw_erc721`, `withdraw_erc20`
 - **Deployment helpers**: `get_deployed_at`, `get_payment_token`, `get_buyback_token`,
   `get_extension_address`, `get_core_dispatcher`, `get_positions_dispatcher`,

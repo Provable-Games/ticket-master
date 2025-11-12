@@ -165,7 +165,8 @@ The contract implements sophisticated time alignment for TWAMM compatibility:
   contract owner. The distribution tick should be derived off-chain after the contract address is known.
 - `provide_initial_liquidity` likewise accepts payment- and dungeon-token amounts plus a minimum
   liquidity threshold, and only the owner may call it. Deployment scripts must forward the desired
-  liquidity configuration at invocation time.
+  liquidity configuration at invocation time. The function stores the returned liquidity position ID
+  in contract storage, accessible via `get_liquidity_position_id()` for tracking the initial liquidity NFT.
 
 ### Issuance Throttling
 

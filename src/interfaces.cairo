@@ -19,9 +19,11 @@ pub trait ITicketMaster<TContractState> {
     fn start_token_distribution(ref self: TContractState) -> (u64, u128);
     fn claim_proceeds(ref self: TContractState) -> u128;
     fn claim_and_distribute_buybacks(ref self: TContractState, limit: u16) -> (u128, u128);
-    fn distribute_proceeds(ref self: TContractState, start_time: u64, end_time: u64);
+    fn distribute_proceeds(ref self: TContractState, end_time: u64);
     fn enable_low_issuance_mode(ref self: TContractState) -> u128;
-    fn disable_low_issuance_mode(ref self: TContractState);
+    fn force_enable_low_issuance_mode(ref self: TContractState) -> u128;
+    fn disable_low_issuance_mode(ref self: TContractState) -> u128;
+    fn force_disable_low_issuance_mode(ref self: TContractState) -> u128;
     fn burn(ref self: TContractState, amount: u256);
     fn burn_from(ref self: TContractState, from: ContractAddress, amount: u256);
     fn set_buyback_order_config(ref self: TContractState, config: BuybackOrderConfig);
@@ -50,6 +52,7 @@ pub trait ITicketMaster<TContractState> {
     fn get_buyback_order_config(self: @TContractState) -> BuybackOrderConfig;
     fn get_pool_id(self: @TContractState) -> u256;
     fn get_position_token_id(self: @TContractState) -> u64;
+    fn get_liquidity_position_id(self: @TContractState) -> u64;
     fn get_payment_token(self: @TContractState) -> ContractAddress;
     fn get_extension_address(self: @TContractState) -> ContractAddress;
     fn get_buyback_token(self: @TContractState) -> ContractAddress;
