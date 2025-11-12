@@ -196,6 +196,7 @@ pub mod TicketMaster {
         ) {
             self.ownable.assert_only_owner();
             assert(self.deployment_state.read() == 0, 'Deployment state is not 0');
+            assert(recipients.len() == amounts.len(), 'Arrays length mismatch');
 
             let token_available = self.tokens_for_distribution.read();
 
@@ -1239,10 +1240,14 @@ pub mod TicketMaster {
         let mut total_distributed: u256 = 0;
 
         if recipients_len > 0 {
+            let zero_address: ContractAddress = 0.try_into().unwrap();
             let mut i = 0;
             while i < recipients_len {
                 let recipient = *recipients.at(i);
                 let amount = *amounts.at(i);
+
+                // Validate recipient is not zero address
+                assert(recipient != zero_address, 'Invalid recipient address');
 
                 // Mint tokens directly to recipient
                 self.erc20.mint(recipient, amount);
