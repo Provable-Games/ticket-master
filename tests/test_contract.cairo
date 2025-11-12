@@ -3844,7 +3844,7 @@ fn distribute_proceeds_before_pool_initialized() {
         MOCK_TREASURY,
     );
 
-    ticket_master_dispatcher.distribute_proceeds(1, 5);
+    ticket_master_dispatcher.distribute_proceeds(5);
 }
 
 #[test]
@@ -3869,7 +3869,7 @@ fn distribute_proceeds_before_distribution_started() {
 
     let _ = ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
 
-    ticket_master_dispatcher.distribute_proceeds(1, 5);
+    ticket_master_dispatcher.distribute_proceeds(5);
 }
 
 // ================================
@@ -3877,51 +3877,7 @@ fn distribute_proceeds_before_distribution_started() {
 // ================================
 
 #[test]
-#[should_panic(expected: 'Invalid start or end time')]
-fn distribute_proceeds_rejects_end_before_start() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Setup through distribution
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-    mock_call(
-        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
-    );
-    ticket_master_dispatcher.start_token_distribution();
-
-    // Try to distribute with end_time <= start_time
-    ticket_master_dispatcher.distribute_proceeds(100_u64, 100_u64);
-}
-
-#[test]
-#[should_panic(expected: 'End time expired')]
+#[should_panic(expected: 'End time must be in the future')]
 fn distribute_proceeds_rejects_expired_end_time() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     mock_ekubo_core(1_u256);
@@ -3965,7 +3921,7 @@ fn distribute_proceeds_rejects_expired_end_time() {
     start_cheat_block_timestamp_global(future_time);
 
     // Try to distribute with end_time in the past (start_time in past, end_time also in past)
-    ticket_master_dispatcher.distribute_proceeds(100_u64, 200_u64);
+    ticket_master_dispatcher.distribute_proceeds(200_u64);
 }
 
 #[test]
@@ -4013,7 +3969,7 @@ fn distribute_proceeds_rejects_duration_too_short() {
 
     // Try to distribute with duration < min_duration
     let short_duration = config.min_duration - 1;
-    ticket_master_dispatcher.distribute_proceeds(current_time, current_time + short_duration);
+    ticket_master_dispatcher.distribute_proceeds(current_time + short_duration);
 }
 
 #[test]
@@ -4061,172 +4017,7 @@ fn distribute_proceeds_rejects_duration_too_long() {
 
     // Try to distribute with duration > max_duration
     let long_duration = config.max_duration + 1;
-    ticket_master_dispatcher.distribute_proceeds(current_time, current_time + long_duration);
-}
-
-#[test]
-#[should_panic(expected: 'Order must start < max delay')]
-fn distribute_proceeds_rejects_delay_exceeds_max() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Setup through distribution
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-    mock_call(
-        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
-    );
-    ticket_master_dispatcher.start_token_distribution();
-
-    // Give contract some payment token balance
-    mock_call(payment_token_dispatcher.contract_address, selector!("balance_of"), 1000_u256, 1);
-
-    let current_time = starknet::get_block_timestamp();
-    let config = ticket_master_dispatcher.get_buyback_order_config();
-
-    // Try to distribute with delay >= max_delay (should fail)
-    let start_time = current_time + config.max_delay;
-    let end_time = start_time + config.min_duration;
-    ticket_master_dispatcher.distribute_proceeds(start_time, end_time);
-}
-
-#[test]
-fn distribute_proceeds_accepts_delay_just_under_max() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Setup through distribution
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-    mock_call(
-        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
-    );
-    ticket_master_dispatcher.start_token_distribution();
-
-    // Transfer payment tokens to the contract (as proceeds)
-    start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
-    payment_token_dispatcher.transfer(ticket_master_dispatcher.contract_address, 1000_u256);
-    stop_cheat_caller_address(payment_token_dispatcher.contract_address);
-
-    // Mock TWAMM position increase
-    mock_call(MOCK_POSITIONS_ADDRESS, selector!("increase_sell_amount"), 888_u128, 1);
-
-    let current_time = starknet::get_block_timestamp();
-    let config = ticket_master_dispatcher.get_buyback_order_config();
-
-    // Distribute with delay just under max_delay (should succeed)
-    let start_time = current_time + config.max_delay - 1;
-    let end_time = start_time + config.min_duration;
-    ticket_master_dispatcher.distribute_proceeds(start_time, end_time);
-}
-
-#[test]
-fn distribute_proceeds_accepts_delay_in_valid_range() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    mock_ekubo_core(1_u256);
-
-    let (ticket_master_dispatcher, payment_token_dispatcher, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Setup through distribution
-    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
-    mock_call(payment_token_dispatcher.contract_address, selector!("transfer_from"), true, 1);
-    mock_call(
-        MOCK_POSITIONS_ADDRESS,
-        selector!("mint_and_deposit_and_clear_both"),
-        (10_u64, 100_u128, 0_u256, 0_u256),
-        1,
-    );
-    ticket_master_dispatcher
-        .provide_initial_liquidity(
-            INITIAL_LIQUIDITY_PAYMENT_TOKEN,
-            INITIAL_LIQUIDITY_DUNGEON_TICKETS,
-            INITIAL_LIQUIDITY_MIN_LIQUIDITY,
-        );
-    mock_call(
-        MOCK_POSITIONS_ADDRESS, selector!("mint_and_increase_sell_amount"), (77_u64, 888_u128), 1,
-    );
-    ticket_master_dispatcher.start_token_distribution();
-
-    // Transfer payment tokens to the contract (as proceeds)
-    start_cheat_caller_address(payment_token_dispatcher.contract_address, DEPLOYER_ADDRESS);
-    payment_token_dispatcher.transfer(ticket_master_dispatcher.contract_address, 1000_u256);
-    stop_cheat_caller_address(payment_token_dispatcher.contract_address);
-
-    // Mock TWAMM position increase
-    mock_call(MOCK_POSITIONS_ADDRESS, selector!("increase_sell_amount"), 888_u128, 1);
-
-    let current_time = starknet::get_block_timestamp();
-    let config = ticket_master_dispatcher.get_buyback_order_config();
-
-    // Distribute with delay in middle of valid range (should succeed)
-    let delay = config.max_delay / 2;
-    let start_time = current_time + delay;
-    let end_time = start_time + config.min_duration;
-    ticket_master_dispatcher.distribute_proceeds(start_time, end_time);
+    ticket_master_dispatcher.distribute_proceeds(current_time + long_duration);
 }
 
 #[test]
@@ -4273,7 +4064,7 @@ fn distribute_proceeds_rejects_when_no_balance() {
     let config = ticket_master_dispatcher.get_buyback_order_config();
 
     // Try to distribute with no proceeds in contract (balance_of returns 0 by default)
-    ticket_master_dispatcher.distribute_proceeds(current_time, current_time + config.min_duration);
+    ticket_master_dispatcher.distribute_proceeds(current_time + config.min_duration);
 }
 
 #[test]

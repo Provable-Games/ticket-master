@@ -3,7 +3,6 @@ pub mod TicketMaster {
     use core::array::ArrayTrait;
     use core::cmp::max;
     use core::hash::{HashStateExTrait, HashStateTrait};
-    use core::num::traits::Zero;
     use core::poseidon::PoseidonTrait;
     use ekubo::interfaces::core::{ICoreDispatcher, ICoreDispatcherTrait};
     use ekubo::interfaces::erc20::IERC20Dispatcher as IERC20DispatcherEkubo;
@@ -335,37 +334,18 @@ pub mod TicketMaster {
 
         /// @notice Distributes the proceeds from selling tokens to the veLords and buybacks
         /// @dev This function should be called periodically to distribute proceeds
-        /// @param start_time The start time of the order
+        /// @dev start time for the order is 0 which will start order immediately
         /// @param end_time The end time of the order
-        fn distribute_proceeds(ref self: ContractState, start_time: u64, end_time: u64) {
+        fn distribute_proceeds(ref self: ContractState, end_time: u64) {
             assert(self.deployment_state.read() == 3, Errors::DISTRIBUTION_NOT_STARTED);
-            assert(self.pool_id.read() != 0, Errors::DISTRIBUTION_POOL_NOT_INITIALIZED);
-            assert(self.position_token_id.read() != 0, Errors::TOKEN_DISTRIBUTION_NOT_STARTED);
 
             let buyback_order_config = _get_buyback_order_config(@self);
-
             let current_time = starknet::get_block_timestamp();
-            assert(end_time > start_time, 'Invalid start or end time');
-            let actual_start = max(current_time, start_time);
-            assert(end_time > actual_start, 'End time expired');
-            let duration = end_time - actual_start;
+            assert(end_time > current_time, 'End time must be in the future');
+
+            let duration = end_time - current_time;
             assert(duration >= buyback_order_config.min_duration, 'Duration too short');
             assert(duration <= buyback_order_config.max_duration, 'Duration too long');
-            // Enforce the order starts within the min/max delay
-            if (buyback_order_config.min_delay.is_non_zero()) {
-                assert(
-                    start_time > current_time
-                        && (start_time - current_time) >= buyback_order_config.min_delay,
-                    'Order must start > min delay',
-                );
-            }
-            // if it starts in the future, make sure it's not too far in the future
-            if (start_time > current_time) {
-                assert(
-                    (start_time - current_time) < buyback_order_config.max_delay,
-                    'Order must start < max delay',
-                );
-            }
 
             // get the amount of payment tokens in the contract
             let payment_token = self.payment_token.read();
@@ -388,7 +368,7 @@ pub mod TicketMaster {
                 .transfer(positions_dispatcher.contract_address, amount_to_buybacks);
 
             let position_token_id = self.position_token_id.read();
-            let order_key = _get_buyback_order_key(@self, start_time, end_time);
+            let order_key = _get_buyback_order_key(@self, 0, end_time);
             let sale_rate_increase = positions_dispatcher
                 .increase_sell_amount(
                     position_token_id, order_key, amount_to_buybacks.try_into().unwrap(),
@@ -1268,16 +1248,17 @@ pub mod TicketMaster {
                 // Ensure recipient is not zero address
                 assert(recipient != zero_address, 'Invalid recipient address');
 
-                // Update total and check it doesn't exceed supply
-                total_distributed += amount;
-                assert(total_distributed <= total_supply.into(), 'Distribution exceeds supply');
-
                 // Mint tokens directly to recipient
                 self.erc20.mint(recipient, amount);
+
+                // Update total and check it doesn't exceed supply
+                total_distributed += amount;
 
                 i += 1;
             };
         }
+
+        assert(total_distributed <= total_supply.into(), 'Distribution exceeds supply');
 
         total_distributed
     }

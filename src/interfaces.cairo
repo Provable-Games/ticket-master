@@ -19,7 +19,7 @@ pub trait ITicketMaster<TContractState> {
     fn start_token_distribution(ref self: TContractState) -> (u64, u128);
     fn claim_proceeds(ref self: TContractState) -> u128;
     fn claim_and_distribute_buybacks(ref self: TContractState, limit: u16) -> (u128, u128);
-    fn distribute_proceeds(ref self: TContractState, start_time: u64, end_time: u64);
+    fn distribute_proceeds(ref self: TContractState, end_time: u64);
     fn enable_low_issuance_mode(ref self: TContractState) -> u128;
     fn force_enable_low_issuance_mode(ref self: TContractState) -> u128;
     fn disable_low_issuance_mode(ref self: TContractState) -> u128;
