@@ -1216,7 +1216,7 @@ pub mod TicketMaster {
         let registry_dispatcher = self.registry_dispatcher.read();
         let erc20_dispatcher = IERC20DispatcherEkubo { contract_address: get_contract_address() };
 
-        // mint one token to theregistry contract
+        // mint one token to the registry contract
         self.erc20.mint(registry_dispatcher.contract_address, ERC20_UNIT.into());
 
         // call register_token on the registry contract
