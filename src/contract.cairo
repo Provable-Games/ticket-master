@@ -106,8 +106,6 @@ pub mod TicketMaster {
     /// @param issuance_reduction_bips The issuance reduction expressed in basis points (out of
     /// 10,000)
     /// @param treasury_address The address of the treasury
-    /// @param recipients The addresses of the recipients of the tokens
-    /// @param amounts The amounts of tokens to mint to the recipients
     /// @param distribution_end_time The end time of the token distribution
     /// @param buyback_order_config The configuration for the buyback orders
     #[constructor]
@@ -131,8 +129,6 @@ pub mod TicketMaster {
         issuance_reduction_price_duration: u64,
         issuance_reduction_bips: u128,
         treasury_address: ContractAddress,
-        recipients: Array<ContractAddress>,
-        amounts: Array<u256>,
         distribution_end_time: u64,
         buyback_order_config: BuybackOrderConfig,
     ) {
@@ -149,11 +145,6 @@ pub mod TicketMaster {
         assert(velords_address != zero_address, 'Invalid veLords address');
         assert(treasury_address != zero_address, 'Invalid treasury address');
         assert(total_supply > 0, 'Invalid total supply');
-
-        // Validate recipients and amounts arrays
-        let recipients_len = recipients.len();
-        let amounts_len = amounts.len();
-        assert(recipients_len == amounts_len, 'Arrays length mismatch');
 
         let current_time = starknet::get_block_timestamp();
         assert!(distribution_end_time > current_time, "End time must be greater than now");
@@ -191,22 +182,34 @@ pub mod TicketMaster {
         self.distribution_end_time.write(distribution_end_time);
         self.buyback_order_config.write(buyback_order_config);
 
-        // Distribute tokens to initial recipients
-        let total_distributed = _distribute_initial_tokens(
-            ref self, recipients, amounts, total_supply, zero_address,
-        );
-
-        let remaining_supply = total_supply.into() - total_distributed;
-
         // register token with Ekubo registry
         _register_token(ref self);
 
         // Store tokens remaining for distribution
-        self.tokens_for_distribution.write(remaining_supply - ERC20_UNIT.into());
+        self.tokens_for_distribution.write(total_supply.into());
     }
 
     #[abi(embed_v0)]
     impl TicketMasterImpl of ITicketMaster<ContractState> {
+        fn premint_tokens(
+            ref self: ContractState, recipients: Array<ContractAddress>, amounts: Array<u256>,
+        ) {
+            self.ownable.assert_only_owner();
+            assert(self.deployment_state.read() == 0, 'Deployment state is not 0');
+            assert(recipients.len() == amounts.len(), 'Arrays length mismatch');
+
+            let token_available = self.tokens_for_distribution.read();
+
+            // Distribute tokens to initial recipients
+            let total_distributed = _distribute_initial_tokens(
+                ref self, recipients, amounts, token_available.try_into().unwrap(),
+            );
+
+            let remaining_supply = token_available - total_distributed;
+
+            self.tokens_for_distribution.write(remaining_supply);
+        }
+
         /// @notice Initializes the TWAMM pools for the distribution and buyback tokens
         /// @dev This function should be called as step 1 after deployment
         /// @param distribution_initial_tick The initial tick for the distribution pool
@@ -1226,25 +1229,24 @@ pub mod TicketMaster {
     /// @param recipients Array of recipient addresses
     /// @param amounts Array of token amounts to distribute
     /// @param total_supply Total supply of tokens
-    /// @param zero_address The zero address for validation
     /// @return Total amount of tokens distributed
     fn _distribute_initial_tokens(
         ref self: ContractState,
         recipients: Array<ContractAddress>,
         amounts: Array<u256>,
         total_supply: u128,
-        zero_address: ContractAddress,
     ) -> u256 {
         let recipients_len = recipients.len();
         let mut total_distributed: u256 = 0;
 
         if recipients_len > 0 {
+            let zero_address: ContractAddress = 0.try_into().unwrap();
             let mut i = 0;
             while i < recipients_len {
                 let recipient = *recipients.at(i);
                 let amount = *amounts.at(i);
 
-                // Ensure recipient is not zero address
+                // Validate recipient is not zero address
                 assert(recipient != zero_address, 'Invalid recipient address');
 
                 // Mint tokens directly to recipient

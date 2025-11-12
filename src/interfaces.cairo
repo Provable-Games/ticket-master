@@ -10,6 +10,9 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait ITicketMaster<TContractState> {
     fn init_distribution_pool(ref self: TContractState, distribution_initial_tick: i129) -> u256;
+    fn premint_tokens(
+        ref self: TContractState, recipients: Array<ContractAddress>, amounts: Array<u256>,
+    );
     fn provide_initial_liquidity(
         ref self: TContractState,
         payment_token_amount: u128,

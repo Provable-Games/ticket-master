@@ -130,8 +130,6 @@ pub fn ticket_master_calldata_custom(
     issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
     treasury_address: ContractAddress,
-    recipients: Array<ContractAddress>,
-    amounts: Array<u256>,
     distribution_end_time: u64,
     buyback_order_config: BuybackOrderConfig,
 ) -> Array<felt252> {
@@ -155,8 +153,6 @@ pub fn ticket_master_calldata_custom(
     issuance_reduction_price_duration.serialize(ref calldata);
     issuance_reduction_bips.serialize(ref calldata);
     treasury_address.serialize(ref calldata);
-    recipients.serialize(ref calldata);
-    amounts.serialize(ref calldata);
     distribution_end_time.serialize(ref calldata);
     buyback_order_config.serialize(ref calldata);
 
@@ -183,8 +179,6 @@ pub fn ticket_master_calldata(
     let symbol: ByteArray = "BDT";
     let total_supply: u128 = DUNGEON_TICKET_SUPPLY;
     let distribution_pool_fee: u128 = DISTRIBUTION_POOL_FEE_BPS;
-    let recipients: Array<ContractAddress> = array![];
-    let amounts: Array<u256> = array![];
     let distribution_end_time: u64 = DISTRIBUTION_END_TIME;
     let buyback_order_config = BUYBACK_ORDER_CONFIG;
 
@@ -207,8 +201,6 @@ pub fn ticket_master_calldata(
         issuance_reduction_price_duration,
         issuance_reduction_bips,
         treasury_address,
-        recipients,
-        amounts,
         distribution_end_time,
         buyback_order_config,
     )

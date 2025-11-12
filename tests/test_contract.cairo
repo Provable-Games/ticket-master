@@ -50,15 +50,6 @@ fn constructor_sets_initial_state() {
 
     let ticket_master_class = declare_class("TicketMaster");
 
-    let alice: ContractAddress = 'alice'.try_into().unwrap();
-    let bob: ContractAddress = 'bob'.try_into().unwrap();
-
-    let amount_alice: u128 = 1_000_000_000_000_000_000;
-    let amount_bob: u128 = 2_000_000_000_000_000_000;
-
-    let recipients = array![alice, bob];
-    let amounts = array![amount_alice.into(), amount_bob.into()];
-
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
         "Beasts Dungeon Ticket",
@@ -78,8 +69,6 @@ fn constructor_sets_initial_state() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -89,6 +78,15 @@ fn constructor_sets_initial_state() {
         contract_address: ticket_master_address,
     };
     let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
+
+    // Call premint_tokens after deployment
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient];
+    let premint_amount: u256 = 1000000_u256;
+    let amounts: Array<u256> = array![premint_amount];
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
 
     assert!(
         ticket_master_dispatcher.get_payment_token() == payment_token_address,
@@ -152,74 +150,35 @@ fn constructor_sets_initial_state() {
     assert!(ticket_master_dispatcher.get_buyback_rate() == 0, "buyback rate should start at 0");
 
     let registry_token_amount: u256 = 1000000000000000000_u128.into();
-    let distributed_to_recipients: u256 = amount_alice.into() + amount_bob.into();
-    let expected_minted_supply = distributed_to_recipients + registry_token_amount;
-    assert!(
-        ticket_token_dispatcher.total_supply() == expected_minted_supply,
-        "unexpected total supply after constructor",
-    );
-    assert!(
-        ticket_token_dispatcher.balance_of(alice) == amount_alice.into(),
-        "alice should receive requested amount",
-    );
-    assert!(
-        ticket_token_dispatcher.balance_of(bob) == amount_bob.into(),
-        "bob should receive requested amount",
-    );
     assert!(
         ticket_token_dispatcher.balance_of(MOCK_REGISTRY_ADDRESS) == registry_token_amount,
         "registry should receive single token",
     );
 
-    let total_supply_u256: u256 = DUNGEON_TICKET_SUPPLY.into();
-    let expected_tokens_for_distribution = total_supply_u256 - expected_minted_supply;
+    let expected_tokens_for_distribution = DUNGEON_TICKET_SUPPLY.into() - premint_amount;
     assert!(
         ticket_master_dispatcher.get_tokens_for_distribution() == expected_tokens_for_distribution,
-        "tokens_for_distribution mismatch",
+        "tokens_for_distribution mismatch. Expected: {}, Actual: {}",
+        expected_tokens_for_distribution,
+        ticket_master_dispatcher.get_tokens_for_distribution(),
     );
 }
 
 #[test]
-#[fuzzer]
-fn test_distribute_initial_tokens_multiple_recipients(delta_a: u64, delta_b: u64, delta_c: u64) {
+fn premint_tokens_distributes_correctly() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
     let erc20_class = declare_class("ERC20Mock");
-
     let payment_token_address = deploy(
         erc20_class,
         token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
     );
-
     let reward_token_address = deploy(
         erc20_class,
         token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
     );
 
     let ticket_master_class = declare_class("TicketMaster");
-
-    let alice: ContractAddress = 'alice_multi'.try_into().unwrap();
-    let bob: ContractAddress = 'bob_multi'.try_into().unwrap();
-    let carol: ContractAddress = 'carol_multi'.try_into().unwrap();
-
-    let registry_token_amount: u128 = 1_000_000_000_000_000_000;
-    let base_alice: u128 = 1_000_000_000_000_000_000;
-    let base_bob: u128 = 2_000_000_000_000_000_000;
-    let base_carol: u128 = 3_000_000_000_000_000_000;
-
-    let perturbation_bound: u128 = 1_000;
-    let amount_alice: u128 = base_alice + ((delta_a.into()) % perturbation_bound);
-    let amount_bob: u128 = base_bob + ((delta_b.into()) % perturbation_bound);
-    let amount_carol: u128 = base_carol + ((delta_c.into()) % perturbation_bound);
-
-    let recipients = array![alice, bob, carol];
-    let amounts = array![amount_alice.into(), amount_bob.into(), amount_carol.into()];
-
-    let total_recipient_mints: u128 = amount_alice + amount_bob + amount_carol;
-    if total_recipient_mints + registry_token_amount >= DUNGEON_TICKET_SUPPLY {
-        return;
-    }
-
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
         "Beasts Dungeon Ticket",
@@ -239,32 +198,211 @@ fn test_distribute_initial_tokens_multiple_recipients(delta_a: u64, delta_b: u64
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
 
-    let ticket_master_address = match ticket_master_class.deploy(@calldata) {
-        Result::Ok((address, _)) => address,
-        Result::Err(_) => { return; },
-    };
+    let ticket_master_address = deploy(ticket_master_class, calldata);
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
     let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
+    let alice: ContractAddress = 'alice_premint'.try_into().unwrap();
+    let bob: ContractAddress = 'bob_premint'.try_into().unwrap();
+    let amount_alice: u128 = 1_000_000_000_000_000_000;
+    let amount_bob: u128 = 2_000_000_000_000_000_000;
+
+    let recipients = array![alice, bob];
+    let amounts = array![amount_alice.into(), amount_bob.into()];
+
+    let tokens_before = ticket_master_dispatcher.get_tokens_for_distribution();
+
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
+
     assert_eq!(ticket_token_dispatcher.balance_of(alice), amount_alice.into());
     assert_eq!(ticket_token_dispatcher.balance_of(bob), amount_bob.into());
-    assert_eq!(ticket_token_dispatcher.balance_of(carol), amount_carol.into());
 
-    let distributed_total: u256 = amount_alice.into()
-        + amount_bob.into()
-        + amount_carol.into()
-        + registry_token_amount.into();
-    let expected_remaining = DUNGEON_TICKET_SUPPLY.into() - distributed_total;
+    let tokens_after = ticket_master_dispatcher.get_tokens_for_distribution();
+    let expected_remaining = tokens_before - amount_alice.into() - amount_bob.into();
+    assert_eq!(tokens_after, expected_remaining);
+}
 
-    assert_eq!(ticket_master_dispatcher.get_tokens_for_distribution(), expected_remaining);
+#[test]
+#[should_panic(expected: ('Caller is not the owner',))]
+fn premint_tokens_rejects_non_owner() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+
+    let erc20_class = declare_class("ERC20Mock");
+    let payment_token_address = deploy(
+        erc20_class,
+        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+    let reward_token_address = deploy(
+        erc20_class,
+        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+
+    let ticket_master_class = declare_class("TicketMaster");
+    let calldata = ticket_master_calldata_custom(
+        DEPLOYER_ADDRESS,
+        "Beasts Dungeon Ticket",
+        "BDT",
+        DUNGEON_TICKET_SUPPLY,
+        DISTRIBUTION_POOL_FEE_BPS,
+        payment_token_address,
+        reward_token_address,
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+        DISTRIBUTION_END_TIME,
+        BUYBACK_ORDER_CONFIG,
+    );
+
+    let ticket_master_address = deploy(ticket_master_class, calldata);
+    let ticket_master_dispatcher = ITicketMasterDispatcher {
+        contract_address: ticket_master_address,
+    };
+
+    let alice: ContractAddress = 'alice'.try_into().unwrap();
+    let recipients = array![alice];
+    let amounts = array![1_000_u128.into()];
+
+    let non_owner: ContractAddress = 'non_owner'.try_into().unwrap();
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, non_owner);
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+}
+
+#[test]
+#[should_panic(expected: ('Deployment state is not 0',))]
+fn premint_tokens_rejects_after_state_transition() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    mock_ekubo_core(1_u256);
+
+    let erc20_class = declare_class("ERC20Mock");
+    let payment_token_address = deploy(
+        erc20_class,
+        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+    let reward_token_address = deploy(
+        erc20_class,
+        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+
+    let ticket_master_class = declare_class("TicketMaster");
+    let calldata = ticket_master_calldata_custom(
+        DEPLOYER_ADDRESS,
+        "Beasts Dungeon Ticket",
+        "BDT",
+        DUNGEON_TICKET_SUPPLY,
+        DISTRIBUTION_POOL_FEE_BPS,
+        payment_token_address,
+        reward_token_address,
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+        DISTRIBUTION_END_TIME,
+        BUYBACK_ORDER_CONFIG,
+    );
+
+    let ticket_master_address = deploy(ticket_master_class, calldata);
+    let ticket_master_dispatcher = ITicketMasterDispatcher {
+        contract_address: ticket_master_address,
+    };
+
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+
+    // Transition to state 1
+    ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
+
+    // Try to premint after state transition
+    let alice: ContractAddress = 'alice'.try_into().unwrap();
+    let recipients = array![alice];
+    let amounts = array![1_000_u128.into()];
+
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+}
+
+#[test]
+fn premint_tokens_can_be_called_multiple_times_in_state_0() {
+    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+
+    let erc20_class = declare_class("ERC20Mock");
+    let payment_token_address = deploy(
+        erc20_class,
+        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+    let reward_token_address = deploy(
+        erc20_class,
+        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
+    );
+
+    let ticket_master_class = declare_class("TicketMaster");
+    let calldata = ticket_master_calldata_custom(
+        DEPLOYER_ADDRESS,
+        "Beasts Dungeon Ticket",
+        "BDT",
+        DUNGEON_TICKET_SUPPLY,
+        DISTRIBUTION_POOL_FEE_BPS,
+        payment_token_address,
+        reward_token_address,
+        MOCK_CORE_ADDRESS,
+        MOCK_POSITIONS_ADDRESS,
+        MOCK_POSITION_NFT_ADDRESS,
+        MOCK_TWAMM_EXTENSION_ADDRESS,
+        MOCK_REGISTRY_ADDRESS,
+        EKUBO_ORACLE_MAINNET,
+        MOCK_VELORDS_ADDRESS,
+        ISSUANCE_REDUCTION_PRICE_X128,
+        ISSUANCE_REDUCTION_PRICE_DURATION,
+        ISSUANCE_REDUCTION_BIPS,
+        MOCK_TREASURY,
+        DISTRIBUTION_END_TIME,
+        BUYBACK_ORDER_CONFIG,
+    );
+
+    let ticket_master_address = deploy(ticket_master_class, calldata);
+    let ticket_master_dispatcher = ITicketMasterDispatcher {
+        contract_address: ticket_master_address,
+    };
+    let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
+
+    let alice: ContractAddress = 'alice_multi'.try_into().unwrap();
+    let bob: ContractAddress = 'bob_multi'.try_into().unwrap();
+
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+
+    // First premint
+    ticket_master_dispatcher.premint_tokens(array![alice], array![1_000_u128.into()]);
+    assert_eq!(ticket_token_dispatcher.balance_of(alice), 1_000_u128.into());
+
+    // Second premint
+    ticket_master_dispatcher.premint_tokens(array![bob], array![2_000_u128.into()]);
+    assert_eq!(ticket_token_dispatcher.balance_of(bob), 2_000_u128.into());
+
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
+
+    // Both should have their balances
+    assert_eq!(ticket_token_dispatcher.balance_of(alice), 1_000_u128.into());
+    assert_eq!(ticket_token_dispatcher.balance_of(bob), 2_000_u128.into());
 }
 
 #[test]
@@ -284,11 +422,8 @@ fn burn_reduces_balance_and_total_supply() {
     let ticket_master_class = declare_class("TicketMaster");
 
     let burner: ContractAddress = 'burner'.try_into().unwrap();
-    let minted_amount: u128 = 10_u128 * ERC20_UNIT;
+    let minted_amount: u256 = 10 * ERC20_UNIT.into();
     let burn_amount: u128 = 4_u128 * ERC20_UNIT;
-
-    let recipients = array![burner];
-    let amounts = array![minted_amount.into()];
 
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
@@ -309,8 +444,6 @@ fn burn_reduces_balance_and_total_supply() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -319,6 +452,11 @@ fn burn_reduces_balance_and_total_supply() {
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
+
+    // set caller to OWNER
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    ticket_master_dispatcher.premint_tokens(array![burner], array![minted_amount.into()]);
+
     let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
     let initial_balance = ticket_token_dispatcher.balance_of(burner);
@@ -356,11 +494,8 @@ fn burn_from_reduces_balance_and_total_supply() {
 
     let burner: ContractAddress = 'burner'.try_into().unwrap();
     let spender: ContractAddress = 'spender'.try_into().unwrap();
-    let minted_amount: u128 = 10_u128 * ERC20_UNIT;
+    let minted_amount: u256 = 10 * ERC20_UNIT.into();
     let burn_amount: u128 = 4_u128 * ERC20_UNIT;
-
-    let recipients = array![burner];
-    let amounts = array![minted_amount.into()];
 
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
@@ -381,8 +516,6 @@ fn burn_from_reduces_balance_and_total_supply() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -391,6 +524,10 @@ fn burn_from_reduces_balance_and_total_supply() {
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
+    // set caller to OWNER
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    ticket_master_dispatcher.premint_tokens(array![burner], array![minted_amount.into()]);
+
     let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
     let initial_balance = ticket_token_dispatcher.balance_of(burner);
@@ -436,7 +573,7 @@ fn burn_from_rejects_without_allowance() {
 
     let burner: ContractAddress = 'burner'.try_into().unwrap();
     let spender: ContractAddress = 'spender'.try_into().unwrap();
-    let minted_amount: u128 = 10_u128 * ERC20_UNIT;
+    let minted_amount: u256 = 10 * ERC20_UNIT.into();
     let burn_amount: u128 = 4_u128 * ERC20_UNIT;
 
     let recipients = array![burner];
@@ -461,8 +598,6 @@ fn burn_from_rejects_without_allowance() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -471,6 +606,10 @@ fn burn_from_rejects_without_allowance() {
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
+    // set caller to OWNER
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+
     let ticket_token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
     assert_eq!(ticket_token_dispatcher.balance_of(burner), minted_amount.into());
@@ -498,56 +637,6 @@ fn fuzz_constructor_valid_configs(
         erc20_class,
         token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
     );
-
-    let recipient_count = (recipient_seed % 4) + 1;
-    let max_distributable: u128 = DUNGEON_TICKET_SUPPLY - 1_000_000_000_000_000_000;
-    let mut recipients: Array<ContractAddress> = array![];
-    let mut amounts: Array<u256> = array![];
-    let mut remaining: u128 = max_distributable;
-    let mut distributed: u128 = 0;
-    let amount_seed: u128 = amount_seed_low.into();
-
-    let offset = recipient_seed % 4;
-
-    let mut index: u64 = 0;
-    loop {
-        if index == recipient_count {
-            break;
-        }
-
-        let candidate_index = (offset + index) % 4;
-        let recipient = match candidate_index {
-            0 => 'seed0'.try_into().unwrap(),
-            1 => 'seed1'.try_into().unwrap(),
-            2 => 'seed2'.try_into().unwrap(),
-            _ => 'seed3'.try_into().unwrap(),
-        };
-        recipients.append(recipient);
-
-        let recipients_left = recipient_count - index;
-        let recipients_left_u128: u128 = recipients_left.into();
-        let max_for_this = if recipients_left_u128 == 0 {
-            0
-        } else {
-            remaining / recipients_left_u128 + 1
-        };
-        let index_u128: u128 = index.into();
-        let raw = amount_seed + index_u128 * 7919_u128;
-        let chosen = if max_for_this == 0 {
-            0
-        } else {
-            raw % max_for_this
-        };
-        amounts.append(chosen.into());
-        distributed += chosen;
-        if chosen > remaining {
-            remaining = 0;
-        } else {
-            remaining -= chosen;
-        }
-
-        index += 1;
-    }
 
     let base_time = 1_000_u64;
     start_cheat_block_timestamp_global(base_time);
@@ -578,8 +667,6 @@ fn fuzz_constructor_valid_configs(
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         end_time,
         BUYBACK_ORDER_CONFIG,
     );
@@ -595,26 +682,8 @@ fn fuzz_constructor_valid_configs(
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
-    let token_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
     assert_eq!(ticket_master_dispatcher.get_deployment_state(), 0_u8);
-
-    let registry_token_amount: u128 = 1_000_000_000_000_000_000;
-    let expected_total_minted: u128 = distributed + registry_token_amount;
-    let expected_tokens_for_distribution: u128 = DUNGEON_TICKET_SUPPLY - expected_total_minted;
-
-    if expected_tokens_for_distribution == 0 {
-        start_cheat_block_timestamp_global(0_u64);
-        return;
-    }
-
-    let total_supply: u256 = token_dispatcher.total_supply();
-    assert_eq!(total_supply, expected_total_minted.into());
-
-    let recorded_tokens_for_distribution = ticket_master_dispatcher.get_tokens_for_distribution();
-    assert_eq!(recorded_tokens_for_distribution, expected_tokens_for_distribution.into());
-
-    start_cheat_block_timestamp_global(0_u64);
 }
 
 #[test]
@@ -648,8 +717,6 @@ fn constructor_rejects_zero_payment_token() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -689,8 +756,6 @@ fn constructor_rejects_zero_reward_token() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -734,8 +799,6 @@ fn constructor_rejects_zero_core_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -779,8 +842,6 @@ fn constructor_rejects_zero_positions_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -824,8 +885,6 @@ fn constructor_rejects_zero_position_nft_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -869,8 +928,6 @@ fn constructor_rejects_zero_extension_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -912,8 +969,6 @@ fn constructor_rejects_zero_registry_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -957,8 +1012,6 @@ fn constructor_rejects_zero_oracle_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1002,8 +1055,6 @@ fn constructor_rejects_zero_velords_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1047,8 +1098,6 @@ fn constructor_rejects_zero_treasury_address() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         ZERO_ADDRESS,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1058,33 +1107,11 @@ fn constructor_rejects_zero_treasury_address() {
 }
 
 #[test]
+#[should_panic(expected: 'Arrays length mismatch')]
 fn constructor_rejects_mismatched_lengths() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
-    let erc20_class = declare_class("ERC20Mock");
-    let payment_token_address = deploy(
-        erc20_class,
-        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-    let reward_token_address = deploy(
-        erc20_class,
-        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-
-    let ticket_master_class = declare_class("TicketMaster");
-
-    let recipient: ContractAddress = 'alice'.try_into().unwrap();
-    let recipients = array![recipient];
-    let empty_amounts: Array<u256> = array![];
-
-    let calldata = ticket_master_calldata_custom(
-        DEPLOYER_ADDRESS,
-        "Beasts Dungeon Ticket",
-        "BDT",
-        DUNGEON_TICKET_SUPPLY,
-        DISTRIBUTION_POOL_FEE_BPS,
-        payment_token_address,
-        reward_token_address,
+    let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
         MOCK_POSITIONS_ADDRESS,
         MOCK_POSITION_NFT_ADDRESS,
@@ -1096,14 +1123,15 @@ fn constructor_rejects_mismatched_lengths() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        empty_amounts,
-        DISTRIBUTION_END_TIME,
-        BUYBACK_ORDER_CONFIG,
     );
 
-    let deploy_result = ticket_master_class.deploy(@calldata);
-    assert_constructor_revert_with_message(deploy_result, 'Arrays length mismatch');
+    // Try to call premint_tokens with mismatched array lengths
+    let recipient1: ContractAddress = 'recipient1'.try_into().unwrap();
+    let recipient2: ContractAddress = 'recipient2'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient1, recipient2];
+    let amounts: Array<u256> = array![1000_u256]; // Only 1 amount for 2 recipients
+
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
 }
 
 #[test]
@@ -1143,8 +1171,6 @@ fn constructor_rejects_end_before_now() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         invalid_end_time,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1202,8 +1228,6 @@ fn constructor_rejects_end_past_max_duration() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         invalid_end_time,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1213,32 +1237,11 @@ fn constructor_rejects_end_past_max_duration() {
 }
 
 #[test]
+#[should_panic(expected: 'Invalid recipient address')]
 fn constructor_rejects_zero_recipient() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
-    let erc20_class = declare_class("ERC20Mock");
-    let payment_token_address = deploy(
-        erc20_class,
-        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-    let reward_token_address = deploy(
-        erc20_class,
-        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-
-    let ticket_master_class = declare_class("TicketMaster");
-
-    let recipients = array![ZERO_ADDRESS];
-    let amounts = array![1_000_u128.into()];
-
-    let calldata = ticket_master_calldata_custom(
-        DEPLOYER_ADDRESS,
-        "Beasts Dungeon Ticket",
-        "BDT",
-        DUNGEON_TICKET_SUPPLY,
-        DISTRIBUTION_POOL_FEE_BPS,
-        payment_token_address,
-        reward_token_address,
+    let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
         MOCK_POSITIONS_ADDRESS,
         MOCK_POSITION_NFT_ADDRESS,
@@ -1250,45 +1253,22 @@ fn constructor_rejects_zero_recipient() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
-        DISTRIBUTION_END_TIME,
-        BUYBACK_ORDER_CONFIG,
     );
 
-    let deploy_result = ticket_master_class.deploy(@calldata);
-    assert_constructor_revert_with_message(deploy_result, 'Invalid recipient address');
+    // Try to call premint_tokens with zero address as recipient
+    let zero_address: ContractAddress = ZERO_ADDRESS;
+    let recipients: Array<ContractAddress> = array![zero_address];
+    let amounts: Array<u256> = array![1000_u256];
+
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
 }
 
 #[test]
+#[should_panic(expected: 'Distribution exceeds supply')]
 fn constructor_rejects_distribution_exceeding_supply() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
-    let erc20_class = declare_class("ERC20Mock");
-    let payment_token_address = deploy(
-        erc20_class,
-        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-    let reward_token_address = deploy(
-        erc20_class,
-        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-
-    let ticket_master_class = declare_class("TicketMaster");
-
-    let recipient: ContractAddress = 'alice'.try_into().unwrap();
-    let recipients = array![recipient];
-    let excessive_amount: u256 = DUNGEON_TICKET_SUPPLY.into() + 1_u128.into();
-    let amounts = array![excessive_amount];
-
-    let calldata = ticket_master_calldata_custom(
-        DEPLOYER_ADDRESS,
-        "Beasts Dungeon Ticket",
-        "BDT",
-        DUNGEON_TICKET_SUPPLY,
-        DISTRIBUTION_POOL_FEE_BPS,
-        payment_token_address,
-        reward_token_address,
+    let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
         MOCK_POSITIONS_ADDRESS,
         MOCK_POSITION_NFT_ADDRESS,
@@ -1300,14 +1280,15 @@ fn constructor_rejects_distribution_exceeding_supply() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
-        DISTRIBUTION_END_TIME,
-        BUYBACK_ORDER_CONFIG,
     );
 
-    let deploy_result = ticket_master_class.deploy(@calldata);
-    assert_constructor_revert_with_message(deploy_result, 'Distribution exceeds supply');
+    // Try to call premint_tokens with amount exceeding total supply
+    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient];
+    let excessive_amount: u256 = (DUNGEON_TICKET_SUPPLY + 1).into(); // More than total supply
+    let amounts: Array<u256> = array![excessive_amount];
+
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
 }
 
 #[test]
@@ -1345,8 +1326,6 @@ fn constructor_rejects_zero_total_supply() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1390,8 +1369,6 @@ fn constructor_rejects_reduction_bips_at_limit() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         BIPS_BASIS, // issuance_reduction_bips at limit (should reject)
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1435,8 +1412,6 @@ fn constructor_accepts_reduction_bips_boundary() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         BIPS_BASIS - 1, // issuance_reduction_bips at boundary (should accept)
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1475,8 +1450,16 @@ fn provide_initial_liquidity_rejects_insufficient_remaining_supply() {
         MOCK_TREASURY,
     );
 
+    // Premint some tokens to reduce available supply
+    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient];
+    let premint_amount: u256 = 1000_u256; // Premint 1000 tokens
+    let amounts: Array<u256> = array![premint_amount];
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+
     let _ = ticket_master_dispatcher.init_distribution_pool(DISTRIBUTION_INITIAL_TICK);
 
+    // Try to use full supply for liquidity, which should fail since we preminted some
     ticket_master_dispatcher
         .provide_initial_liquidity(
             INITIAL_LIQUIDITY_PAYMENT_TOKEN, DUNGEON_TICKET_SUPPLY, INITIAL_LIQUIDITY_MIN_LIQUIDITY,
@@ -1853,8 +1836,6 @@ fn test_provide_initial_liquidity_consumes_stored_config(
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -1931,8 +1912,6 @@ fn test_provide_initial_liquidity_updates_tokens_for_distribution() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![],
-        array![],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -5222,8 +5201,8 @@ fn get_tokens_for_distribution_returns_initial_value() {
     );
 
     let tokens = ticket_master_dispatcher.get_tokens_for_distribution();
-    // Should be total supply minus 1 ERC20_UNIT (for registry)
-    let expected = DUNGEON_TICKET_SUPPLY.into() - ERC20_UNIT.into();
+    // Should be total supply (registry token not deducted from tokens_for_distribution)
+    let expected = DUNGEON_TICKET_SUPPLY.into();
     assert_eq!(tokens, expected, "Tokens for distribution should match");
 }
 
@@ -5235,30 +5214,7 @@ fn get_tokens_for_distribution_returns_initial_value() {
 fn burn_reduces_total_supply() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
 
-    let erc20_class = declare_class("ERC20Mock");
-    let payment_token_address = deploy(
-        erc20_class,
-        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-    let reward_token_address = deploy(
-        erc20_class,
-        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-
-    let ticket_master_class = declare_class("TicketMaster");
-
-    // Create a deployment with initial distribution to deployer so they have tokens to burn
-    let recipients: Array<ContractAddress> = array![DEPLOYER_ADDRESS];
-    let amounts: Array<u256> = array![1000000_u256];
-
-    let calldata = ticket_master_calldata_custom(
-        DEPLOYER_ADDRESS,
-        "Beasts Dungeon Ticket",
-        "BDT",
-        DUNGEON_TICKET_SUPPLY,
-        DISTRIBUTION_POOL_FEE_BPS,
-        payment_token_address,
-        reward_token_address,
+    let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
         MOCK_POSITIONS_ADDRESS,
         MOCK_POSITION_NFT_ADDRESS,
@@ -5270,19 +5226,16 @@ fn burn_reduces_total_supply() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
-        DISTRIBUTION_END_TIME,
-        BUYBACK_ORDER_CONFIG,
     );
 
-    let ticket_master_address = deploy(ticket_master_class, calldata);
-    let ticket_master_dispatcher = ITicketMasterDispatcher {
-        contract_address: ticket_master_address,
+    let erc20_dispatcher = IERC20Dispatcher {
+        contract_address: ticket_master_dispatcher.contract_address,
     };
-    let erc20_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
 
-    start_cheat_caller_address(ticket_master_address, DEPLOYER_ADDRESS);
+    // Premint tokens to deployer so they have tokens to burn
+    let recipients: Array<ContractAddress> = array![DEPLOYER_ADDRESS];
+    let amounts: Array<u256> = array![1000000_u256];
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
 
     let initial_supply = erc20_dispatcher.total_supply();
     let burn_amount = 500000_u256;
@@ -5339,10 +5292,6 @@ fn burn_from_reduces_target_balance() {
 
     let ticket_master_class = declare_class("TicketMaster");
 
-    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
-    let recipients: Array<ContractAddress> = array![recipient];
-    let amounts: Array<u256> = array![1000000_u256];
-
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
         "Beasts Dungeon Ticket",
@@ -5362,8 +5311,6 @@ fn burn_from_reduces_target_balance() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -5373,6 +5320,14 @@ fn burn_from_reduces_target_balance() {
         contract_address: ticket_master_address,
     };
     let erc20_dispatcher = IERC20Dispatcher { contract_address: ticket_master_address };
+
+    // change to OWNER
+    start_cheat_caller_address(ticket_master_address, DEPLOYER_ADDRESS);
+    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient];
+    let amounts: Array<u256> = array![1000000_u256];
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+    stop_cheat_caller_address(ticket_master_address);
 
     // Recipient approves deployer to burn their tokens
     start_cheat_caller_address(ticket_master_address, recipient);
@@ -5408,10 +5363,6 @@ fn burn_from_reverts_without_approval() {
 
     let ticket_master_class = declare_class("TicketMaster");
 
-    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
-    let recipients: Array<ContractAddress> = array![recipient];
-    let amounts: Array<u256> = array![1000000_u256];
-
     let calldata = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
         "Beasts Dungeon Ticket",
@@ -5431,8 +5382,6 @@ fn burn_from_reverts_without_approval() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        recipients,
-        amounts,
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -5441,6 +5390,14 @@ fn burn_from_reverts_without_approval() {
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
+
+    // change to OWNER
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    let recipient: ContractAddress = 'recipient'.try_into().unwrap();
+    let recipients: Array<ContractAddress> = array![recipient];
+    let amounts: Array<u256> = array![1000000_u256];
+    ticket_master_dispatcher.premint_tokens(recipients, amounts);
+    stop_cheat_caller_address(ticket_master_address);
 
     // Deployer tries to burn tokens from recipient without approval
     start_cheat_caller_address(ticket_master_address, DEPLOYER_ADDRESS);
@@ -5830,14 +5787,7 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
     );
     let payment_token_dispatcher = IERC20Dispatcher { contract_address: payment_token_address };
 
-    let registry_token: u128 = 1_000_000_000_000_000_000;
-    let recipient: ContractAddress = 'tiny_recipient'.try_into().unwrap();
     let total_supply: u128 = DUNGEON_TICKET_SUPPLY;
-    let minimal_distribution = 10_000_000_000_000_000_u128;
-    let recipient_amount = total_supply
-        - registry_token
-        - INITIAL_LIQUIDITY_DUNGEON_TICKETS
-        - minimal_distribution;
 
     let calldata_minimal = ticket_master_calldata_custom(
         DEPLOYER_ADDRESS,
@@ -5858,8 +5808,6 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
         MOCK_TREASURY,
-        array![recipient],
-        array![recipient_amount.into()],
         DISTRIBUTION_END_TIME,
         BUYBACK_ORDER_CONFIG,
     );
@@ -5872,6 +5820,15 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
     let ticket_master_dispatcher = ITicketMasterDispatcher {
         contract_address: ticket_master_address,
     };
+
+    // change to OWNER
+    start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
+    let recipient: ContractAddress = 'tiny_recipient'.try_into().unwrap();
+    let minimal_distribution = 10_000_000_000_000_000_u128;
+    // Registry token is no longer deducted from tokens_for_distribution
+    let recipient_amount = total_supply - INITIAL_LIQUIDITY_DUNGEON_TICKETS - minimal_distribution;
+    ticket_master_dispatcher.premint_tokens(array![recipient], array![recipient_amount.into()]);
+    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
 
     let expected_tokens_before_liquidity = INITIAL_LIQUIDITY_DUNGEON_TICKETS.into()
         + minimal_distribution.into();
