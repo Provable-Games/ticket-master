@@ -354,15 +354,12 @@ pub mod TicketMaster {
             // use all proceeds to buy back the reward token via DCA
             // start by moving the proceeds to positions contract
             let positions_dispatcher = self.positions_dispatcher.read();
-            payment_token_dispatcher
-                .transfer(positions_dispatcher.contract_address, proceeds);
+            payment_token_dispatcher.transfer(positions_dispatcher.contract_address, proceeds);
 
             let position_token_id = self.position_token_id.read();
             let order_key = _get_buyback_order_key(@self, 0, end_time);
             let sale_rate_increase = positions_dispatcher
-                .increase_sell_amount(
-                    position_token_id, order_key, proceeds.try_into().unwrap(),
-                );
+                .increase_sell_amount(position_token_id, order_key, proceeds.try_into().unwrap());
 
             // Update the rewards distribution rate
             let previous_sale_rate = self.buyback_rate.read();
