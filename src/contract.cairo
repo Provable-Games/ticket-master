@@ -181,7 +181,7 @@ pub mod TicketMaster {
         _register_token(ref self);
 
         // Store tokens remaining for distribution
-        self.tokens_for_distribution.write(total_supply.into());
+        self.tokens_for_distribution.write((total_supply - ERC20_UNIT).into());
     }
 
     #[abi(embed_v0)]
