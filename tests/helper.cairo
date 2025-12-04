@@ -17,7 +17,6 @@ pub fn setup(
     extension_address: ContractAddress,
     registry_address: ContractAddress,
     oracle_address: ContractAddress,
-    velords_address: ContractAddress,
     issuance_reduction_price_x128: u256,
     issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
@@ -47,7 +46,6 @@ pub fn setup(
             extension_address,
             registry_address,
             oracle_address,
-            velords_address,
             issuance_reduction_price_x128,
             issuance_reduction_price_duration,
             issuance_reduction_bips,
@@ -125,7 +123,6 @@ pub fn ticket_master_calldata_custom(
     extension_address: ContractAddress,
     registry_address: ContractAddress,
     oracle_address: ContractAddress,
-    velords_address: ContractAddress,
     issuance_reduction_price_x128: u256,
     issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
@@ -148,7 +145,6 @@ pub fn ticket_master_calldata_custom(
     extension_address.serialize(ref calldata);
     registry_address.serialize(ref calldata);
     oracle_address.serialize(ref calldata);
-    velords_address.serialize(ref calldata);
     issuance_reduction_price_x128.serialize(ref calldata);
     issuance_reduction_price_duration.serialize(ref calldata);
     issuance_reduction_bips.serialize(ref calldata);
@@ -168,7 +164,6 @@ pub fn ticket_master_calldata(
     extension_address: ContractAddress,
     registry_address: ContractAddress,
     oracle_address: ContractAddress,
-    velords_address: ContractAddress,
     issuance_reduction_price_x128: u256,
     issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
@@ -196,7 +191,6 @@ pub fn ticket_master_calldata(
         extension_address,
         registry_address,
         oracle_address,
-        velords_address,
         issuance_reduction_price_x128,
         issuance_reduction_price_duration,
         issuance_reduction_bips,

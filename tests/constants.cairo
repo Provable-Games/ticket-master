@@ -80,7 +80,6 @@ pub const EKUBO_ORACLE_SEPOLIA: ContractAddress =
     .unwrap();
 
 pub const MOCK_TREASURY: ContractAddress = 'treasury'.try_into().unwrap();
-pub const MOCK_VELORDS_ADDRESS: ContractAddress = 'velords'.try_into().unwrap();
 
 pub const MAINNET_TREASURY: ContractAddress =
     0x041bb7729efa185f2cab327de0a668886302f1d4969e3edf504c4741648f858b
