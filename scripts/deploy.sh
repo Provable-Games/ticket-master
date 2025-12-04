@@ -290,7 +290,7 @@ if [[ "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" =~ ^0+$ ]] || [[ "$INITIAL_DUNGEON_TICK
     exit 1
 fi
 
-TARGET_CLASS="/workspace/ticket-master/target/release/ticket_master_TicketMaster.contract_class.json"
+TARGET_CLASS="target/release/ticket_master_TicketMaster.contract_class.json"
 print_info "Building package"
 scarb --release build
 if [ ! -f "$TARGET_CLASS" ]; then
