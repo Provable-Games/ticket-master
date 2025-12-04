@@ -170,10 +170,6 @@ PY
 }
 
 resolve_owner_address() {
-    if [ -n "${OWNER_ADDRESS:-}" ] && [ "${OWNER_ADDRESS}" != "0x0" ]; then
-        echo "$OWNER_ADDRESS"
-        return 0
-    fi
     if command -v jq >/dev/null 2>&1 && [ -f "$STARKNET_ACCOUNT" ]; then
         local candidate
         candidate=$(jq -r '.deployment.address // .address // empty' "$STARKNET_ACCOUNT" 2>/dev/null || true)
@@ -182,13 +178,18 @@ resolve_owner_address() {
             return 0
         fi
     fi
-    print_error "Unable to determine OWNER_ADDRESS. Set OWNER_ADDRESS in your environment."
+    print_error "Unable to determine deployer address from $STARKNET_ACCOUNT"
     exit 1
 }
 
 require_env STARKNET_NETWORK STARKNET_RPC STARKNET_ACCOUNT STARKNET_PK TOKEN_NAME TOKEN_SYMBOL TOKEN_SUPPLY PAYMENT_TOKEN BUYBACK_TOKEN TREASURY_ADDRESS
 
-OWNER=$(resolve_owner_address)
+DEPLOYER=$(resolve_owner_address)
+FINAL_OWNER=${OWNER_ADDRESS:-$DEPLOYER}
+print_info "Resolved deployer address: $DEPLOYER"
+if [ "$FINAL_OWNER" != "$DEPLOYER" ]; then
+    print_info "Will transfer ownership to: $FINAL_OWNER"
+fi
 TOKEN_NAME_ENC="bytearray:str:${TOKEN_NAME}"
 TOKEN_SYMBOL_ENC="bytearray:str:${TOKEN_SYMBOL}"
 TOTAL_SUPPLY=${TOKEN_SUPPLY}
@@ -202,7 +203,6 @@ case "$STARKNET_NETWORK" in
         EXTENSION_ADDRESS_DEFAULT="0x073ec792c33b52d5f96940c2860d512b3884f2127d25e023eb9d44a678e4b971"
         REGISTRY_ADDRESS_DEFAULT="0x04484f91f0d2482bad844471ca8dc8e846d3a0211792322e72f21f0f44be63e5"
         ORACLE_ADDRESS_DEFAULT="0x003ccf3ee24638dd5f1a51ceb783e120695f53893f6fd947cc2dcabb3f86dc65"
-        VELORDS_ADDRESS_DEFAULT=""
         ;;
     mainnet)
         CORE_ADDRESS_DEFAULT="0x00000005dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b"
@@ -210,7 +210,6 @@ case "$STARKNET_NETWORK" in
         EXTENSION_ADDRESS_DEFAULT="0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc"
         REGISTRY_ADDRESS_DEFAULT="0x064bdb4094881140bc39340146c5fcc5a187a98aec5a53f448ac702e5de5067e"
         ORACLE_ADDRESS_DEFAULT="0x005e470ff654d834983a46b8f29dfa99963d5044b993cb7b9c92243a69dab38f"
-        VELORDS_ADDRESS_DEFAULT="0x045c587318c9ebcf2fbe21febf288ee2e3597a21cd48676005a5770a50d433c5"
         ;;
     *)
         print_warn "Unknown network ${STARKNET_NETWORK}. Provide EKUBO_* environment overrides."
@@ -219,7 +218,6 @@ case "$STARKNET_NETWORK" in
         EXTENSION_ADDRESS_DEFAULT=""
         REGISTRY_ADDRESS_DEFAULT=""
         ORACLE_ADDRESS_DEFAULT=""
-        VELORDS_ADDRESS_DEFAULT=""
         ;;
 esac
 
@@ -228,7 +226,6 @@ POSITIONS_ADDRESS="${EKUBO_POSITIONS_ADDRESS:-$POSITIONS_ADDRESS_DEFAULT}"
 EXTENSION_ADDRESS="${EKUBO_TWAMM_EXTENSION_ADDRESS:-$EXTENSION_ADDRESS_DEFAULT}"
 REGISTRY_ADDRESS="${EKUBO_REGISTRY_ADDRESS:-$REGISTRY_ADDRESS_DEFAULT}"
 ORACLE_ADDRESS="${EKUBO_ORACLE_ADDRESS:-$ORACLE_ADDRESS_DEFAULT}"
-VELORDS_ADDRESS="${EKUBO_VELORDS_ADDRESS:-$VELORDS_ADDRESS_DEFAULT}"
 if [ -z "${POSITION_NFT_ADDRESS:-}" ]; then
     POSITION_NFT_ADDRESS="$POSITIONS_ADDRESS"
 fi
@@ -243,30 +240,36 @@ fi
 ISSUANCE_REDUCTION_PRICE_DURATION=${ISSUANCE_REDUCTION_PRICE_DURATION:-259200}
 ISSUANCE_REDUCTION_BIPS=${ISSUANCE_REDUCTION_BIPS:-2500}
 
-RECIPIENTS_PARAM=(0)
-AMOUNTS_PARAM=(0)
+# Parse premint recipients and amounts if provided
+PREMINT_RECIPIENTS=()
+PREMINT_AMOUNTS=()
 if [ -n "${RECIPIENTS:-}" ] && [ -n "${AMOUNTS:-}" ]; then
     IFS=',' read -ra RECIPIENT_ARRAY <<< "${RECIPIENTS}"
     IFS=',' read -ra AMOUNT_ARRAY <<< "${AMOUNTS}"
     if [ ${#RECIPIENT_ARRAY[@]} -ne ${#AMOUNT_ARRAY[@]} ]; then
-        print_error "Recipients and amounts must have matching lengths"
+        print_error "RECIPIENTS and AMOUNTS must have matching lengths"
         exit 1
     fi
-    RECIPIENTS_PARAM=("${#RECIPIENT_ARRAY[@]}")
     for recipient in "${RECIPIENT_ARRAY[@]}"; do
         recipient_trimmed="${recipient//[[:space:]]/}"
         if [ -z "$recipient_trimmed" ]; then
             print_error "Recipient address cannot be empty"
             exit 1
         fi
-        RECIPIENTS_PARAM+=("$recipient_trimmed")
+        PREMINT_RECIPIENTS+=("$recipient_trimmed")
     done
-    AMOUNTS_PARAM=("${#AMOUNT_ARRAY[@]}")
     for amt in "${AMOUNT_ARRAY[@]}"; do
         amt_trimmed="${amt//[[:space:]]/}"
-        read -r low high < <(to_u256_parts "$amt_trimmed")
-        AMOUNTS_PARAM+=("$low" "$high")
+        if [ -z "$amt_trimmed" ]; then
+            print_error "Amount cannot be empty"
+            exit 1
+        fi
+        PREMINT_AMOUNTS+=("$amt_trimmed")
     done
+    print_info "Premint configuration: ${#PREMINT_RECIPIENTS[@]} recipient(s)"
+elif [ -n "${RECIPIENTS:-}" ] || [ -n "${AMOUNTS:-}" ]; then
+    print_error "Both RECIPIENTS and AMOUNTS must be provided together, or neither"
+    exit 1
 fi
 
 DISTRIBUTION_END_TIME=${DISTRIBUTION_END_TIMESTAMP}
@@ -287,9 +290,9 @@ if [[ "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" =~ ^0+$ ]] || [[ "$INITIAL_DUNGEON_TICK
     exit 1
 fi
 
-TARGET_CLASS="target/dev/ticket_master_TicketMaster.contract_class.json"
+TARGET_CLASS="target/release/ticket_master_TicketMaster.contract_class.json"
 print_info "Building package"
-scarb build
+scarb --release build
 if [ ! -f "$TARGET_CLASS" ]; then
     print_error "Contract artifact not found at $TARGET_CLASS"
     exit 1
@@ -312,7 +315,7 @@ fi
 print_info "Class hash: $CLASS_HASH"
 
 CONSTRUCTOR_ARGS=(
-    "$OWNER"
+    "$DEPLOYER"
     "$TOKEN_NAME_ENC"
     "$TOKEN_SYMBOL_ENC"
     "$TOTAL_SUPPLY"
@@ -325,17 +328,11 @@ CONSTRUCTOR_ARGS=(
     "$EXTENSION_ADDRESS"
     "$REGISTRY_ADDRESS"
     "$ORACLE_ADDRESS"
-    "$VELORDS_ADDRESS"
     "$ISSUANCE_PRICE_LOW"
     "$ISSUANCE_PRICE_HIGH"
     "$ISSUANCE_REDUCTION_PRICE_DURATION"
     "$ISSUANCE_REDUCTION_BIPS"
     "$TREASURY_ADDRESS"
-)
-
-CONSTRUCTOR_ARGS+=("${RECIPIENTS_PARAM[@]}")
-CONSTRUCTOR_ARGS+=("${AMOUNTS_PARAM[@]}")
-CONSTRUCTOR_ARGS+=(
     "$DISTRIBUTION_END_TIME"
     "$BUYBACK_MIN_DELAY"
     "$BUYBACK_MAX_DELAY"
@@ -347,7 +344,8 @@ CONSTRUCTOR_ARGS+=(
 print_info "Deployment parameters"
 echo "  Network:            $STARKNET_NETWORK"
 echo "  RPC:                $STARKNET_RPC"
-echo "  Owner:              $OWNER"
+echo "  Deployer:           $DEPLOYER"
+echo "  Final owner:        $FINAL_OWNER"
 echo "  Token:              $TOKEN_NAME ($TOKEN_SYMBOL)"
 echo "  Total supply:       $TOTAL_SUPPLY"
 echo "  Distribution fee:   $DISTRIBUTION_POOL_FEE"
@@ -360,7 +358,6 @@ echo "  Position NFT:       $POSITION_NFT_ADDRESS"
 echo "  Extension:          $EXTENSION_ADDRESS"
 echo "  Registry:           $REGISTRY_ADDRESS"
 echo "  Oracle:             $ORACLE_ADDRESS"
-echo "  Velords:            $VELORDS_ADDRESS"
 echo "  End time:           $DISTRIBUTION_END_TIME"
 echo "  Initial pay liq:    $INITIAL_PAYMENT_TOKEN_LIQUIDITY"
 echo "  Initial ticket liq: $INITIAL_DUNGEON_TICKET_LIQUIDITY"
@@ -476,53 +473,100 @@ cat > "$DEPLOY_FILE" <<EOF
   }
 }
 EOF
-print_info "Approving payment token"
-APPROVE_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$PAYMENT_TOKEN" approve "$CONTRACT_ADDRESS" u256:$INITIAL_PAYMENT_TOKEN_LIQUIDITY 2>&1 || true)
-APPROVE_EXIT=$?
-if [ $APPROVE_EXIT -ne 0 ]; then
-    print_error "Payment token approval failed"
-    echo "$APPROVE_OUTPUT"
-    exit 1
-fi
-APPROVE_TX=$(echo "$APPROVE_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
-if [ -n "$APPROVE_TX" ]; then print_tx "$APPROVE_TX"; fi
 
-print_info "Initializing distribution pool"
-INIT_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" init_distribution_pool "$DIST_TICK_MAG" "$DIST_TICK_SIGN" 2>&1 || true)
-INIT_EXIT=$?
-if [ $INIT_EXIT -ne 0 ]; then
-    print_error "init_distribution_pool failed"
-    echo "$INIT_OUTPUT"
-    exit 1
-fi
-INIT_TX=$(echo "$INIT_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
-if [ -n "$INIT_TX" ]; then print_tx "$INIT_TX"; fi
+# Call premint_tokens if recipients and amounts were provided
+if [ ${#PREMINT_RECIPIENTS[@]} -gt 0 ]; then
+    print_info "Preminting tokens to ${#PREMINT_RECIPIENTS[@]} recipient(s)"
 
-print_info "Providing initial liquidity"
-echo "  Payment token (wei): $INITIAL_PAYMENT_TOKEN_LIQUIDITY"
-echo "  Dungeon token (wei): $INITIAL_DUNGEON_TICKET_LIQUIDITY"
-echo "  Min liquidity:       $INITIAL_MIN_LIQUIDITY"
-#starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" provide_initial_liquidity "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" "$INITIAL_DUNGEON_TICKET_LIQUIDITY" "$INITIAL_MIN_LIQUIDITY"
-LIQ_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" provide_initial_liquidity "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" "$INITIAL_DUNGEON_TICKET_LIQUIDITY" "$INITIAL_MIN_LIQUIDITY" 2>&1 || true)
-LIQ_EXIT=$?
-if [ $LIQ_EXIT -ne 0 ]; then
-    print_error "provide_initial_liquidity failed"
-    echo "$LIQ_OUTPUT"
-    exit 1
-fi
-LIQ_TX=$(echo "$LIQ_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
-if [ -n "$LIQ_TX" ]; then print_tx "$LIQ_TX"; fi
+    # Build the recipients array argument
+    RECIPIENTS_ARRAY_ARG="${#PREMINT_RECIPIENTS[@]}"
+    for recipient in "${PREMINT_RECIPIENTS[@]}"; do
+        RECIPIENTS_ARRAY_ARG="$RECIPIENTS_ARRAY_ARG $recipient"
+    done
 
-print_info "Starting token distribution"
-DIST_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" start_token_distribution 2>&1 || true)
-DIST_EXIT=$?
-if [ $DIST_EXIT -ne 0 ]; then
-    print_error "start_token_distribution failed"
-    echo "$DIST_OUTPUT"
-    exit 1
+    # Build the amounts array argument (convert each amount to u256)
+    AMOUNTS_ARRAY_ARG="${#PREMINT_AMOUNTS[@]}"
+    for amt in "${PREMINT_AMOUNTS[@]}"; do
+        read -r low high < <(to_u256_parts "$amt")
+        AMOUNTS_ARRAY_ARG="$AMOUNTS_ARRAY_ARG $low $high"
+    done
+
+    # Call premint_tokens
+    PREMINT_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" premint_tokens $RECIPIENTS_ARRAY_ARG $AMOUNTS_ARRAY_ARG)
+    #PREMINT_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" premint_tokens $RECIPIENTS_ARRAY_ARG $AMOUNTS_ARRAY_ARG 2>&1 || true)
+    PREMINT_EXIT=$?
+    if [ $PREMINT_EXIT -ne 0 ]; then
+        print_error "premint_tokens failed"
+        echo "$PREMINT_OUTPUT"
+        exit 1
+    fi
+    PREMINT_TX=$(echo "$PREMINT_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+    if [ -n "$PREMINT_TX" ]; then print_tx "$PREMINT_TX"; fi
+    print_info "Tokens preminted successfully"
 fi
-DIST_TX=$(echo "$DIST_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
-if [ -n "$DIST_TX" ]; then print_tx "$DIST_TX"; fi
+
+# Transfer ownership to final owner if different from deployer
+if [ "$FINAL_OWNER" != "$DEPLOYER" ]; then
+    print_info "Transferring ownership to $FINAL_OWNER"
+    TRANSFER_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" transfer_ownership "$FINAL_OWNER" 2>&1 || true)
+    TRANSFER_EXIT=$?
+    if [ $TRANSFER_EXIT -ne 0 ]; then
+        print_error "transfer_ownership failed"
+        echo "$TRANSFER_OUTPUT"
+        exit 1
+    fi
+    TRANSFER_TX=$(echo "$TRANSFER_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+    if [ -n "$TRANSFER_TX" ]; then print_tx "$TRANSFER_TX"; fi
+    print_info "Ownership transferred successfully"
+fi
+
+# print_info "Approving payment token"
+# APPROVE_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$PAYMENT_TOKEN" approve "$CONTRACT_ADDRESS" u256:$INITIAL_PAYMENT_TOKEN_LIQUIDITY 2>&1 || true)
+# APPROVE_EXIT=$?
+# if [ $APPROVE_EXIT -ne 0 ]; then
+#     print_error "Payment token approval failed"
+#     echo "$APPROVE_OUTPUT"
+#     exit 1
+# fi
+# APPROVE_TX=$(echo "$APPROVE_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+# if [ -n "$APPROVE_TX" ]; then print_tx "$APPROVE_TX"; fi
+
+# print_info "Initializing distribution pool"
+# INIT_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" init_distribution_pool "$DIST_TICK_MAG" "$DIST_TICK_SIGN" 2>&1 || true)
+# INIT_EXIT=$?
+# if [ $INIT_EXIT -ne 0 ]; then
+#     print_error "init_distribution_pool failed"
+#     echo "$INIT_OUTPUT"
+#     exit 1
+# fi
+# INIT_TX=$(echo "$INIT_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+# if [ -n "$INIT_TX" ]; then print_tx "$INIT_TX"; fi
+
+# print_info "Providing initial liquidity"
+# echo "  Payment token (wei): $INITIAL_PAYMENT_TOKEN_LIQUIDITY"
+# echo "  Dungeon token (wei): $INITIAL_DUNGEON_TICKET_LIQUIDITY"
+# echo "  Min liquidity:       $INITIAL_MIN_LIQUIDITY"
+# #starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" provide_initial_liquidity "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" "$INITIAL_DUNGEON_TICKET_LIQUIDITY" "$INITIAL_MIN_LIQUIDITY"
+# LIQ_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" provide_initial_liquidity "$INITIAL_PAYMENT_TOKEN_LIQUIDITY" "$INITIAL_DUNGEON_TICKET_LIQUIDITY" "$INITIAL_MIN_LIQUIDITY" 2>&1 || true)
+# LIQ_EXIT=$?
+# if [ $LIQ_EXIT -ne 0 ]; then
+#     print_error "provide_initial_liquidity failed"
+#     echo "$LIQ_OUTPUT"
+#     exit 1
+# fi
+# LIQ_TX=$(echo "$LIQ_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+# if [ -n "$LIQ_TX" ]; then print_tx "$LIQ_TX"; fi
+
+# print_info "Starting token distribution"
+# DIST_OUTPUT=$(starkli invoke --watch --account "$STARKNET_ACCOUNT" --private-key "$STARKNET_PK" --rpc "$STARKNET_RPC" "$CONTRACT_ADDRESS" start_token_distribution 2>&1 || true)
+# DIST_EXIT=$?
+# if [ $DIST_EXIT -ne 0 ]; then
+#     print_error "start_token_distribution failed"
+#     echo "$DIST_OUTPUT"
+#     exit 1
+# fi
+# DIST_TX=$(echo "$DIST_OUTPUT" | grep -oE 'transaction: 0x[0-9a-fA-F]+' | head -1 | awk '{print $2}')
+# if [ -n "$DIST_TX" ]; then print_tx "$DIST_TX"; fi
 
 print_info "Deployment workflow complete"
 print_info "Deployment details saved to $DEPLOY_FILE"

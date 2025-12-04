@@ -71,7 +71,6 @@ pub mod TicketMaster {
         pub deployment_state: u8, // State machine: 0=initial, 1=pool_initialized, 2=liquidity_provided, 3=distribution_started
         pub tokens_for_distribution: u256, // Tokens to mint for TWAMM distribution
         pub treasury_address: ContractAddress,
-        pub velords_address: ContractAddress,
         pub buyback_order_config: BuybackOrderConfig,
     }
 
@@ -97,7 +96,6 @@ pub mod TicketMaster {
     /// @param extension_address The address of the Ekubo extension contract
     /// @param registry_address The address of the Ekubo registry contract
     /// @param oracle_address The address of the Ekubo oracle contract
-    /// @param velords_address The address that receives the veLords proceeds share
     /// @param position_nft_address The address of the ERC721 contract that minted the distribution
     /// position token
     /// @param issuance_reduction_price_x128 The 3-day average price threshold (Q128) that triggers
@@ -124,7 +122,6 @@ pub mod TicketMaster {
         extension_address: ContractAddress,
         registry_address: ContractAddress,
         oracle_address: ContractAddress,
-        velords_address: ContractAddress,
         issuance_reduction_price_x128: u256,
         issuance_reduction_price_duration: u64,
         issuance_reduction_bips: u128,
@@ -142,7 +139,6 @@ pub mod TicketMaster {
         assert(extension_address != zero_address, 'Invalid extension address');
         assert(registry_address != zero_address, 'Invalid registry address');
         assert(oracle_address != zero_address, 'Invalid oracle address');
-        assert(velords_address != zero_address, 'Invalid veLords address');
         assert(treasury_address != zero_address, 'Invalid treasury address');
         assert(total_supply > 0, 'Invalid total supply');
 
@@ -172,7 +168,6 @@ pub mod TicketMaster {
             .registry_dispatcher
             .write(ITokenRegistryDispatcher { contract_address: registry_address });
         self.treasury_address.write(treasury_address);
-        self.velords_address.write(velords_address);
         self.oracle_address.write(IOracleDispatcher { contract_address: oracle_address });
         assert(issuance_reduction_bips < BIPS_BASIS, Errors::INVALID_REDUCTION_BIPS);
         self.issuance_reduction_price_x128.write(issuance_reduction_price_x128);
@@ -186,7 +181,7 @@ pub mod TicketMaster {
         _register_token(ref self);
 
         // Store tokens remaining for distribution
-        self.tokens_for_distribution.write(total_supply.into());
+        self.tokens_for_distribution.write((total_supply - ERC20_UNIT).into());
     }
 
     #[abi(embed_v0)]
@@ -334,7 +329,7 @@ pub mod TicketMaster {
             proceeds
         }
 
-        /// @notice Distributes the proceeds from selling tokens to the veLords and buybacks
+        /// @notice Distributes the proceeds from selling tokens to buybacks
         /// @dev This function should be called periodically to distribute proceeds
         /// @dev start time for the order is 0 which will start order immediately
         /// @param end_time The end time of the order
@@ -356,25 +351,15 @@ pub mod TicketMaster {
 
             assert(proceeds > 0, 'No proceeds available');
 
-            let amount_to_velords = proceeds / 5;
-            let amount_to_buybacks = proceeds - amount_to_velords;
-
-            let velords_address = self.velords_address.read();
-            // send 20% to veLords
-            payment_token_dispatcher.transfer(velords_address, amount_to_velords);
-
-            // use the remainder to buy back the reward token via DCA
-            // start by moving the remaining proceeds to positions contract
+            // use all proceeds to buy back the reward token via DCA
+            // start by moving the proceeds to positions contract
             let positions_dispatcher = self.positions_dispatcher.read();
-            payment_token_dispatcher
-                .transfer(positions_dispatcher.contract_address, amount_to_buybacks);
+            payment_token_dispatcher.transfer(positions_dispatcher.contract_address, proceeds);
 
             let position_token_id = self.position_token_id.read();
             let order_key = _get_buyback_order_key(@self, 0, end_time);
             let sale_rate_increase = positions_dispatcher
-                .increase_sell_amount(
-                    position_token_id, order_key, amount_to_buybacks.try_into().unwrap(),
-                );
+                .increase_sell_amount(position_token_id, order_key, proceeds.try_into().unwrap());
 
             // Update the rewards distribution rate
             let previous_sale_rate = self.buyback_rate.read();
@@ -391,7 +376,7 @@ pub mod TicketMaster {
             self.buyback_order_key_counter.write(order_index + 1);
         }
 
-        /// @notice Claims the proceeds from selling tokens and distributes them to the veLords and
+        /// @notice Claims the proceeds from buyback orders and sends them to the treasury
         /// @param limit The maximum number of buyback orders to claim
         /// @dev If limit is 0, all buyback orders will be claimed
         /// @return u128 The amount of proceeds claimed
@@ -532,16 +517,6 @@ pub mod TicketMaster {
             assert(treasury_address != zero_address, Errors::INVALID_RECIPIENT);
 
             self.treasury_address.write(treasury_address);
-        }
-
-        /// @notice Updates the veLords distribution recipient address
-        /// @param velords_address The new veLords recipient address
-        fn set_velords_address(ref self: ContractState, velords_address: ContractAddress) {
-            self.ownable.assert_only_owner();
-            let zero_address: ContractAddress = 0.try_into().unwrap();
-            assert(velords_address != zero_address, Errors::INVALID_RECIPIENT);
-
-            self.velords_address.write(velords_address);
         }
 
         /// @notice Withdraws ERC20 tokens from the contract
@@ -741,12 +716,6 @@ pub mod TicketMaster {
         /// @return ContractAddress The address of the treasury
         fn get_treasury_address(self: @ContractState) -> ContractAddress {
             _get_treasury_address(self)
-        }
-
-        /// @notice Returns the address that receives the veLords share
-        /// @return ContractAddress The veLords recipient address
-        fn get_velords_address(self: @ContractState) -> ContractAddress {
-            _get_velords_address(self)
         }
 
         fn get_buyback_order_key_counter(self: @ContractState) -> u128 {
@@ -1017,11 +986,6 @@ pub mod TicketMaster {
     #[inline(always)]
     fn _get_treasury_address(self: @ContractState) -> ContractAddress {
         self.treasury_address.read()
-    }
-
-    #[inline(always)]
-    fn _get_velords_address(self: @ContractState) -> ContractAddress {
-        self.velords_address.read()
     }
 
     #[inline(always)]

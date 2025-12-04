@@ -34,7 +34,6 @@ pub trait ITicketMaster<TContractState> {
     fn set_issuance_reduction_price_duration(ref self: TContractState, duration: u64);
     fn set_issuance_reduction_bips(ref self: TContractState, bips: u128);
     fn set_treasury_address(ref self: TContractState, treasury_address: ContractAddress);
-    fn set_velords_address(ref self: TContractState, velords_address: ContractAddress);
     fn withdraw_erc20(ref self: TContractState, token_address: ContractAddress, amount: u256);
     fn withdraw_erc721(ref self: TContractState, token_address: ContractAddress, token_id: u256);
     fn get_token_distribution_rate(self: @TContractState) -> u128;
@@ -63,7 +62,6 @@ pub trait ITicketMaster<TContractState> {
     fn get_oracle_address(self: @TContractState) -> IOracleDispatcher;
     fn get_tokens_for_distribution(self: @TContractState) -> u256;
     fn get_treasury_address(self: @TContractState) -> ContractAddress;
-    fn get_velords_address(self: @TContractState) -> ContractAddress;
     fn get_distribution_pool_key_hash(self: @TContractState) -> felt252;
     fn is_pool_initialized(self: @TContractState) -> bool;
     fn get_deployment_state(self: @TContractState) -> u8;

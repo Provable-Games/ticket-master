@@ -25,7 +25,7 @@ use super::constants::{
     MAINNET_POSITION_NFT_ADDRESS, MAINNET_REGISTRY_ADDRESS, MAINNET_TREASURY,
     MAINNET_TWAMM_EXTENSION_ADDRESS, MOCK_CORE_ADDRESS, MOCK_POSITIONS_ADDRESS,
     MOCK_POSITION_NFT_ADDRESS, MOCK_REGISTRY_ADDRESS, MOCK_TREASURY, MOCK_TWAMM_EXTENSION_ADDRESS,
-    MOCK_VELORDS_ADDRESS, PAYMENT_TOKEN_INITIAL_SUPPLY, REWARD_TOKEN_INITIAL_SUPPLY, ZERO_ADDRESS,
+    PAYMENT_TOKEN_INITIAL_SUPPLY, REWARD_TOKEN_INITIAL_SUPPLY, ZERO_ADDRESS,
 };
 use super::helper::{
     declare_class, deploy, mock_ekubo_core, panic_data_to_byte_array, setup,
@@ -64,7 +64,6 @@ fn constructor_sets_initial_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -97,10 +96,6 @@ fn constructor_sets_initial_state() {
         "buyback token mismatch",
     );
     assert!(ticket_master_dispatcher.get_treasury_address() == MOCK_TREASURY, "treasury mismatch");
-    assert!(
-        ticket_master_dispatcher.get_velords_address() == MOCK_VELORDS_ADDRESS,
-        "veLords address mismatch",
-    );
     assert!(
         ticket_master_dispatcher.get_core_dispatcher().contract_address == MOCK_CORE_ADDRESS,
         "core dispatcher mismatch",
@@ -155,7 +150,9 @@ fn constructor_sets_initial_state() {
         "registry should receive single token",
     );
 
-    let expected_tokens_for_distribution = DUNGEON_TICKET_SUPPLY.into() - premint_amount;
+    let expected_tokens_for_distribution = DUNGEON_TICKET_SUPPLY.into()
+        - premint_amount
+        - registry_token_amount;
     assert!(
         ticket_master_dispatcher.get_tokens_for_distribution() == expected_tokens_for_distribution,
         "tokens_for_distribution mismatch. Expected: {}, Actual: {}",
@@ -193,7 +190,6 @@ fn premint_tokens_distributes_correctly() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -260,7 +256,6 @@ fn premint_tokens_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -314,7 +309,6 @@ fn premint_tokens_rejects_after_state_transition() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -370,7 +364,6 @@ fn premint_tokens_can_be_called_multiple_times_in_state_0() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -439,7 +432,6 @@ fn burn_reduces_balance_and_total_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -511,7 +503,6 @@ fn burn_from_reduces_balance_and_total_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -593,7 +584,6 @@ fn burn_from_rejects_without_allowance() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -662,7 +652,6 @@ fn fuzz_constructor_valid_configs(
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -712,7 +701,6 @@ fn constructor_rejects_zero_payment_token() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -751,7 +739,6 @@ fn constructor_rejects_zero_reward_token() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -794,7 +781,6 @@ fn constructor_rejects_zero_core_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -837,7 +823,6 @@ fn constructor_rejects_zero_positions_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -880,7 +865,6 @@ fn constructor_rejects_zero_position_nft_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -923,7 +907,6 @@ fn constructor_rejects_zero_extension_address() {
         ZERO_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -964,7 +947,6 @@ fn constructor_rejects_zero_registry_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         ZERO_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1007,7 +989,6 @@ fn constructor_rejects_zero_oracle_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         ZERO_ADDRESS,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1018,49 +999,6 @@ fn constructor_rejects_zero_oracle_address() {
 
     let deploy_result = ticket_master_class.deploy(@calldata);
     assert_constructor_revert_with_message(deploy_result, 'Invalid oracle address');
-}
-
-#[test]
-fn constructor_rejects_zero_velords_address() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let erc20_class = declare_class("ERC20Mock");
-    let payment_token_address = deploy(
-        erc20_class,
-        token_calldata("Payment Token", "PT", PAYMENT_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-    let reward_token_address = deploy(
-        erc20_class,
-        token_calldata("Reward Token", "RT", REWARD_TOKEN_INITIAL_SUPPLY, DEPLOYER_ADDRESS),
-    );
-
-    let ticket_master_class = declare_class("TicketMaster");
-
-    let calldata = ticket_master_calldata_custom(
-        DEPLOYER_ADDRESS,
-        "Beasts Dungeon Ticket",
-        "BDT",
-        DUNGEON_TICKET_SUPPLY,
-        DISTRIBUTION_POOL_FEE_BPS,
-        payment_token_address,
-        reward_token_address,
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        ZERO_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-        DISTRIBUTION_END_TIME,
-        BUYBACK_ORDER_CONFIG,
-    );
-
-    let deploy_result = ticket_master_class.deploy(@calldata);
-    assert_constructor_revert_with_message(deploy_result, 'Invalid veLords address');
 }
 
 #[test]
@@ -1093,7 +1031,6 @@ fn constructor_rejects_zero_treasury_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1118,7 +1055,6 @@ fn constructor_rejects_mismatched_lengths() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1166,7 +1102,6 @@ fn constructor_rejects_end_before_now() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1223,7 +1158,6 @@ fn constructor_rejects_end_past_max_duration() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1248,7 +1182,6 @@ fn constructor_rejects_zero_recipient() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1275,7 +1208,6 @@ fn constructor_rejects_distribution_exceeding_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1321,7 +1253,6 @@ fn constructor_rejects_zero_total_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1364,7 +1295,6 @@ fn constructor_rejects_reduction_bips_at_limit() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         BIPS_BASIS, // issuance_reduction_bips at limit (should reject)
@@ -1407,7 +1337,6 @@ fn constructor_accepts_reduction_bips_boundary() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         BIPS_BASIS - 1, // issuance_reduction_bips at boundary (should accept)
@@ -1443,7 +1372,6 @@ fn provide_initial_liquidity_rejects_insufficient_remaining_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1479,7 +1407,6 @@ fn provide_initial_liquidity_rejects_when_tokens_insufficient() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1513,7 +1440,6 @@ fn provide_initial_liquidity_rejects_zero_payment_amount() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1541,7 +1467,6 @@ fn provide_initial_liquidity_rejects_zero_dungeon_amount() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1568,7 +1493,6 @@ fn init_distribution_pool_sets_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1597,7 +1521,6 @@ fn init_distribution_pool_wrong_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1622,7 +1545,6 @@ fn init_distribution_pool_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1649,7 +1571,6 @@ fn provide_initial_liquidity_happy_path() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1702,7 +1623,6 @@ fn provide_initial_liquidity_wrong_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1730,7 +1650,6 @@ fn provide_initial_liquidity_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1765,7 +1684,6 @@ fn provide_initial_liquidity_without_pool_id() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1831,7 +1749,6 @@ fn test_provide_initial_liquidity_consumes_stored_config(
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1907,7 +1824,6 @@ fn test_provide_initial_liquidity_updates_tokens_for_distribution() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1969,7 +1885,6 @@ fn start_token_distribution_wrong_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -1991,7 +1906,6 @@ fn start_token_distribution_without_pool() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2020,7 +1934,6 @@ fn start_token_distribution_happy_path() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2072,7 +1985,6 @@ fn get_deployment_state_transitions_correctly() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2139,7 +2051,6 @@ fn init_distribution_pool_cannot_be_called_twice() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2165,7 +2076,6 @@ fn provide_initial_liquidity_requires_state_1() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2195,7 +2105,6 @@ fn provide_initial_liquidity_cannot_be_called_twice() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2242,7 +2151,6 @@ fn start_token_distribution_requires_state_2() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2269,7 +2177,6 @@ fn start_token_distribution_cannot_be_called_twice() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2312,7 +2219,6 @@ fn withdraw_erc721_owner_fork() {
         MAINNET_TWAMM_EXTENSION_ADDRESS,
         MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2367,7 +2273,6 @@ fn withdraw_erc721_not_owner_fork() {
         MAINNET_TWAMM_EXTENSION_ADDRESS,
         MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2422,7 +2327,6 @@ fn claim_proceeds_before_pool_initialized() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2445,7 +2349,6 @@ fn claim_proceeds_before_distribution_started() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2469,7 +2372,6 @@ fn claim_proceeds_returns_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2517,7 +2419,6 @@ fn low_issuance_mode_adjusts_distribution_rate() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2613,7 +2514,6 @@ fn enable_low_issuance_mode_rejects_before_distribution_started() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2654,7 +2554,6 @@ fn enable_low_issuance_mode_rejects_when_already_active() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2704,7 +2603,6 @@ fn enable_low_issuance_mode_rejects_when_price_not_below_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2752,7 +2650,6 @@ fn enable_low_issuance_mode_rejects_when_price_equals_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2803,7 +2700,6 @@ fn enable_low_issuance_mode_succeeds_when_price_below_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2859,7 +2755,6 @@ fn disable_low_issuance_mode_rejects_when_not_active() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2904,7 +2799,6 @@ fn disable_low_issuance_mode_rejects_when_price_not_above_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -2957,7 +2851,6 @@ fn disable_low_issuance_mode_rejects_when_price_equals_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3015,7 +2908,6 @@ fn disable_low_issuance_mode_rejects_when_no_tickets_available() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3082,7 +2974,6 @@ fn disable_low_issuance_mode_succeeds_when_price_above_threshold() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3158,7 +3049,6 @@ fn force_enable_low_issuance_mode_succeeds_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3212,7 +3102,6 @@ fn force_enable_low_issuance_mode_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3260,7 +3149,6 @@ fn force_disable_low_issuance_mode_succeeds_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3331,7 +3219,6 @@ fn force_disable_low_issuance_mode_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3392,7 +3279,6 @@ fn set_issuance_reduction_price_duration_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3417,7 +3303,6 @@ fn set_issuance_reduction_price_duration_rejects_zero() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3439,7 +3324,6 @@ fn set_issuance_reduction_price_duration_succeeds() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3473,7 +3357,6 @@ fn set_issuance_reduction_price_x128_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3498,7 +3381,6 @@ fn set_issuance_reduction_price_x128_rejects_zero() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3520,7 +3402,6 @@ fn set_issuance_reduction_price_x128_succeeds() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3553,7 +3434,6 @@ fn set_issuance_reduction_bips_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3578,7 +3458,6 @@ fn set_issuance_reduction_bips_rejects_zero() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3601,7 +3480,6 @@ fn set_issuance_reduction_bips_rejects_exceeds_basis() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3623,7 +3501,6 @@ fn set_issuance_reduction_bips_succeeds() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3643,62 +3520,6 @@ fn set_issuance_reduction_bips_succeeds() {
 
 #[test]
 #[should_panic(expected: ('Caller is not the owner',))]
-fn set_velords_address_rejects_non_owner() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-    let NON_OWNER_ADDRESS: ContractAddress = 'non_owner'.try_into().unwrap();
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Try to set velords address as non-owner
-    let new_velords_address: ContractAddress = 0x999.try_into().unwrap();
-    start_cheat_caller_address(ticket_master_dispatcher.contract_address, NON_OWNER_ADDRESS);
-    ticket_master_dispatcher.set_velords_address(new_velords_address);
-    stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
-}
-
-#[test]
-fn set_velords_address_succeeds() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    // Verify initial velords address
-    assert_eq!(ticket_master_dispatcher.get_velords_address(), MOCK_VELORDS_ADDRESS);
-
-    // Set new velords address
-    let new_velords_address: ContractAddress = 0x999.try_into().unwrap();
-    ticket_master_dispatcher.set_velords_address(new_velords_address);
-
-    // Verify address was updated
-    assert_eq!(ticket_master_dispatcher.get_velords_address(), new_velords_address);
-}
-
-#[test]
-#[should_panic(expected: ('Caller is not the owner',))]
 fn withdraw_erc20_rejects_non_owner() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
     let NON_OWNER_ADDRESS: ContractAddress = 'non_owner'.try_into().unwrap();
@@ -3710,7 +3531,6 @@ fn withdraw_erc20_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3734,7 +3554,6 @@ fn withdraw_erc20_succeeds_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3781,7 +3600,6 @@ fn withdraw_erc20_can_withdraw_full_balance() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3816,7 +3634,6 @@ fn distribute_proceeds_before_pool_initialized() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3839,7 +3656,6 @@ fn distribute_proceeds_before_distribution_started() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3868,7 +3684,6 @@ fn distribute_proceeds_rejects_expired_end_time() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3916,7 +3731,6 @@ fn distribute_proceeds_rejects_duration_too_short() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -3964,7 +3778,6 @@ fn distribute_proceeds_rejects_duration_too_long() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4012,7 +3825,6 @@ fn distribute_proceeds_rejects_when_no_balance() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4061,7 +3873,6 @@ fn fuzz_buyback_claim_limits(
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4210,7 +4021,6 @@ fn claim_and_distribute_buybacks_claims_limited_matured_orders() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4263,7 +4073,6 @@ fn claim_and_distribute_buybacks_limit_zero_claims_remaining() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4312,7 +4121,6 @@ fn test_claim_and_distribute_buybacks_success_path() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4358,7 +4166,6 @@ fn claim_and_distribute_buybacks_when_all_claimed() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4385,7 +4192,6 @@ fn test_claim_and_distribute_buybacks_without_mature_proceeds() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4418,7 +4224,6 @@ fn set_treasury_address_updates_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4447,7 +4252,6 @@ fn set_treasury_address_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4473,7 +4277,6 @@ fn set_treasury_address_no_zero_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4499,7 +4302,6 @@ fn set_issuance_reduction_price_x128_updates_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4524,7 +4326,6 @@ fn set_issuance_reduction_price_x128_rejects_zero_price() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4545,7 +4346,6 @@ fn set_issuance_reduction_bips_updates_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4570,7 +4370,6 @@ fn set_issuance_reduction_bips_rejects_zero_bips() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4592,7 +4391,6 @@ fn set_issuance_reduction_bips_rejects_bips_above_limit() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4617,7 +4415,6 @@ fn get_token_distribution_rate_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4639,7 +4436,6 @@ fn get_buyback_rate_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4661,7 +4457,6 @@ fn get_distribution_end_time_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4683,7 +4478,6 @@ fn get_pool_id_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4705,7 +4499,6 @@ fn get_position_token_id_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4727,7 +4520,6 @@ fn get_payment_token_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4753,7 +4545,6 @@ fn get_buyback_token_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4779,7 +4570,6 @@ fn get_extension_address_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4801,7 +4591,6 @@ fn get_issuance_reduction_price_x128_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4825,7 +4614,6 @@ fn is_low_issuance_mode_returns_false_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4847,7 +4635,6 @@ fn get_treasury_address_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4856,28 +4643,6 @@ fn get_treasury_address_returns_configured_value() {
 
     let treasury = ticket_master_dispatcher.get_treasury_address();
     assert_eq!(treasury, MOCK_TREASURY, "Treasury address should match constructor value");
-}
-
-#[test]
-fn get_velords_address_returns_configured_value() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    let velords = ticket_master_dispatcher.get_velords_address();
-    assert_eq!(velords, MOCK_VELORDS_ADDRESS, "VeLords address should match constructor value");
 }
 
 #[test]
@@ -4891,7 +4656,6 @@ fn get_position_nft_address_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4913,7 +4677,6 @@ fn get_issuance_reduction_bips_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4935,7 +4698,6 @@ fn get_deployment_state_returns_initial_state() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4957,7 +4719,6 @@ fn is_pool_initialized_returns_false_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -4979,7 +4740,6 @@ fn get_buyback_order_key_counter_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5001,7 +4761,6 @@ fn get_buyback_order_key_bookmark_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5023,7 +4782,6 @@ fn get_unclaimed_buyback_orders_count_returns_zero_initially() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5045,7 +4803,6 @@ fn get_distribution_pool_fee_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5069,7 +4826,6 @@ fn get_buyback_order_config_returns_configured_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5095,7 +4851,6 @@ fn get_core_dispatcher_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5117,7 +4872,6 @@ fn get_positions_dispatcher_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5143,7 +4897,6 @@ fn get_registry_dispatcher_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5169,7 +4922,6 @@ fn get_oracle_address_returns_configured_address() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5185,6 +4937,7 @@ fn get_oracle_address_returns_configured_address() {
 #[test]
 fn get_tokens_for_distribution_returns_initial_value() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    let registry_token_amount: u256 = 1000000000000000000_u128.into();
 
     let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
@@ -5193,7 +4946,6 @@ fn get_tokens_for_distribution_returns_initial_value() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5201,9 +4953,16 @@ fn get_tokens_for_distribution_returns_initial_value() {
     );
 
     let tokens = ticket_master_dispatcher.get_tokens_for_distribution();
+
     // Should be total supply (registry token not deducted from tokens_for_distribution)
-    let expected = DUNGEON_TICKET_SUPPLY.into();
-    assert_eq!(tokens, expected, "Tokens for distribution should match");
+    let expected = DUNGEON_TICKET_SUPPLY.into() - registry_token_amount;
+    assert_eq!(
+        tokens,
+        expected,
+        "Tokens for distribution should match. Expected: {}, Actual: {}",
+        expected,
+        tokens,
+    );
 }
 
 // ================================
@@ -5221,7 +4980,6 @@ fn burn_reduces_total_supply() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5260,7 +5018,6 @@ fn burn_reverts_when_insufficient_balance() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5306,7 +5063,6 @@ fn burn_from_reduces_target_balance() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5377,7 +5133,6 @@ fn burn_from_reverts_without_approval() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5415,7 +5170,6 @@ fn set_issuance_reduction_bips_accepts_bips_at_limit() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5425,52 +5179,6 @@ fn set_issuance_reduction_bips_accepts_bips_at_limit() {
     ticket_master_dispatcher.set_issuance_reduction_bips(BIPS_BASIS);
 
     assert_eq!(ticket_master_dispatcher.get_issuance_reduction_bips(), BIPS_BASIS);
-}
-
-#[test]
-fn set_velords_address_updates_for_owner() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    let new_velords: ContractAddress = 'new_velords'.try_into().unwrap();
-    ticket_master_dispatcher.set_velords_address(new_velords);
-
-    assert_eq!(ticket_master_dispatcher.get_velords_address(), new_velords);
-}
-
-#[test]
-#[should_panic(expected: 'invalid recipient')]
-fn set_velords_address_rejects_zero_address() {
-    start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
-
-    let (ticket_master_dispatcher, _, _) = setup(
-        MOCK_CORE_ADDRESS,
-        MOCK_POSITIONS_ADDRESS,
-        MOCK_POSITION_NFT_ADDRESS,
-        MOCK_TWAMM_EXTENSION_ADDRESS,
-        MOCK_REGISTRY_ADDRESS,
-        EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
-        ISSUANCE_REDUCTION_PRICE_X128,
-        ISSUANCE_REDUCTION_PRICE_DURATION,
-        ISSUANCE_REDUCTION_BIPS,
-        MOCK_TREASURY,
-    );
-
-    ticket_master_dispatcher.set_velords_address(ZERO_ADDRESS);
 }
 
 #[test]
@@ -5484,7 +5192,6 @@ fn set_buyback_order_config_updates_for_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5520,7 +5227,6 @@ fn set_buyback_order_config_rejects_non_owner() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5551,7 +5257,6 @@ fn test_get_distribution_end_time_after_constructor() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5572,7 +5277,6 @@ fn get_distribution_pool_key_respects_token_ordering() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5606,7 +5310,6 @@ fn pause_like_behavior_via_owner_change() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5670,7 +5373,6 @@ fn insufficient_payment_tokens_edge() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5738,7 +5440,6 @@ fn test_start_token_distribution_without_tokens() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5803,7 +5504,6 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -5825,8 +5525,11 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
     start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
     let recipient: ContractAddress = 'tiny_recipient'.try_into().unwrap();
     let minimal_distribution = 10_000_000_000_000_000_u128;
-    // Registry token is no longer deducted from tokens_for_distribution
-    let recipient_amount = total_supply - INITIAL_LIQUIDITY_DUNGEON_TICKETS - minimal_distribution;
+    // Registry token (ERC20_UNIT) is deducted from tokens_for_distribution
+    let recipient_amount = total_supply
+        - INITIAL_LIQUIDITY_DUNGEON_TICKETS
+        - minimal_distribution
+        - ERC20_UNIT;
     ticket_master_dispatcher.premint_tokens(array![recipient], array![recipient_amount.into()]);
     stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
 
@@ -5897,7 +5600,6 @@ fn simple_mainnet() {
         MAINNET_TWAMM_EXTENSION_ADDRESS,
         MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -6008,7 +5710,6 @@ fn mainnet_full() {
         MAINNET_TWAMM_EXTENSION_ADDRESS,
         MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -6090,7 +5791,6 @@ fn test_get_liquidity_position_id_matches_provide_initial_liquidity() {
         MAINNET_TWAMM_EXTENSION_ADDRESS,
         MAINNET_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,
@@ -6136,7 +5836,6 @@ fn mock_simple_flow() {
         MOCK_TWAMM_EXTENSION_ADDRESS,
         MOCK_REGISTRY_ADDRESS,
         EKUBO_ORACLE_MAINNET,
-        MOCK_VELORDS_ADDRESS,
         ISSUANCE_REDUCTION_PRICE_X128,
         ISSUANCE_REDUCTION_PRICE_DURATION,
         ISSUANCE_REDUCTION_BIPS,

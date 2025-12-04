@@ -45,7 +45,6 @@ constructor(
     extension_address: ContractAddress,
     registry_address: ContractAddress,
     oracle_address: ContractAddress,
-    velords_address: ContractAddress,
     issuance_reduction_price_x128: u256,
     issuance_reduction_price_duration: u64,
     issuance_reduction_bips: u128,
@@ -61,8 +60,7 @@ constructor(
 - Mints the distribution ERC20 to a configurable list of recipients and records the remainder for
   TWAMM execution (`tokens_for_distribution`)
 - Stores Ekubo dispatchers (core, positions, registry, extension), the associated position NFT
-  address, oracle access, the veLords revenue recipient, and bootstrap parameters for both the
-  distribution and buyback legs
+  address, oracle access, and bootstrap parameters for both the distribution and buyback legs
 - Defers pool ticks and seed liquidity to owner-only bootstrap calls so deployment-time pricing can
   be computed off-chain after the contract address is known
 - Validates and caches issuance throttling configuration: a Q128 price threshold (`issuance_reduction_price_x128`),
@@ -102,7 +100,7 @@ The contract follows a strict four-phase deployment sequence:
 
 4. **Recycle Proceeds** – Ongoing operations after distribution starts:
    - `claim_proceeds()`: Withdraws realized payment token sales from the distribution TWAMM order
-   - `distribute_proceeds(end_time)`: Splits proceeds 80% to buybacks and 20% to veLords, then creates a new TWAMM buyback order that starts immediately and runs until `end_time`
+   - `distribute_proceeds(end_time)`: Uses all proceeds to create a new TWAMM buyback order that starts immediately and runs until `end_time`
    - `claim_and_distribute_buybacks(limit)`: Iterates through matured buyback orders, withdrawing completed buyback tokens and forwarding them to the treasury address
 
 ### Buyback Order Configuration
@@ -155,13 +153,12 @@ The on-chain interface (`ITicketMaster`) exposes:
   `get_distribution_end_time`, `get_distribution_initial_tick`, `get_dungeon_ticket_price_x128`
 - **Issuance telemetry**: `is_low_issuance_mode`, `get_issuance_reduction_price_x128`,
   `get_issuance_reduction_price_duration`, `get_issuance_reduction_bips`
-- **Administrative controls**: `set_treasury_address`, `set_velords_address`,
-  `set_issuance_reduction_price_x128`, `set_issuance_reduction_price_duration`,
-  `set_issuance_reduction_bips`, `set_buyback_order_config`,
+- **Administrative controls**: `set_treasury_address`, `set_issuance_reduction_price_x128`,
+  `set_issuance_reduction_price_duration`, `set_issuance_reduction_bips`, `set_buyback_order_config`,
   `withdraw_erc721`, `withdraw_erc20`
 - **Deployment helpers**: `get_deployed_at`, `get_payment_token`, `get_buyback_token`,
   `get_extension_address`, `get_core_dispatcher`, `get_positions_dispatcher`,
-  `get_registry_dispatcher`, `get_oracle_address`, `get_velords_address`, `get_treasury_address`,
+  `get_registry_dispatcher`, `get_oracle_address`, `get_treasury_address`,
   `is_pool_initialized`, `get_deployment_state`
 
 ### Time Utilities
@@ -239,13 +236,13 @@ scarb fmt
 ## Security Considerations
 
 - **State machine guards**: Prevent re-entry into lifecycle phases out of order through strict `deployment_state` assertions
-- **Address validation**: All external addresses (tokens, Ekubo contracts, treasury, veLords) are validated against the zero address during construction
+- **Address validation**: All external addresses (tokens, Ekubo contracts, treasury) are validated against the zero address during construction
 - **Distribution supply protection**: Distribution supply is only minted when the TWAMM order is opened, preventing stranded balances
 - **Time alignment**: Clamps distribution windows and enforces Ekubo's maximum duration to prevent invalid TWAMM operations
 - **Issuance throttling safeguards**: Validates the configured oracle price floor, lookback duration, and basis-point reduction before mutating the distribution rate. Ensures reduction bips are less than `BIPS_BASIS` (10000) to prevent arithmetic errors
 - **Emergency controls**: The owner can use `withdraw_erc20` and `withdraw_erc721` to recover any ERC20 or ERC721 tokens from the contract
 - **Administrative flexibility**: The owner can adjust `issuance_reduction_price_duration` via `set_issuance_reduction_price_duration` to tune the oracle lookback period without redeployment
-- **Revenue distribution**: The 20% veLords revenue share ships with a constructor-provided address that the owner can rotate post-deployment via `set_velords_address`. Treasury address can similarly be updated via `set_treasury_address`
+- **Revenue distribution**: All proceeds are used for buybacks, with the resulting tokens sent to the treasury. The treasury address can be updated via `set_treasury_address`
 - **Registry integration**: Token registration with Ekubo's registry is part of deployment, ensuring the token metadata is discoverable on-chain
 
 ## Contributing
