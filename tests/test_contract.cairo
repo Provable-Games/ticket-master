@@ -150,7 +150,9 @@ fn constructor_sets_initial_state() {
         "registry should receive single token",
     );
 
-    let expected_tokens_for_distribution = DUNGEON_TICKET_SUPPLY.into() - premint_amount;
+    let expected_tokens_for_distribution = DUNGEON_TICKET_SUPPLY.into()
+        - premint_amount
+        - registry_token_amount;
     assert!(
         ticket_master_dispatcher.get_tokens_for_distribution() == expected_tokens_for_distribution,
         "tokens_for_distribution mismatch. Expected: {}, Actual: {}",
@@ -4935,6 +4937,7 @@ fn get_oracle_address_returns_configured_address() {
 #[test]
 fn get_tokens_for_distribution_returns_initial_value() {
     start_mock_call(MOCK_REGISTRY_ADDRESS, selector!("register_token"), 0);
+    let registry_token_amount: u256 = 1000000000000000000_u128.into();
 
     let (ticket_master_dispatcher, _, _) = setup(
         MOCK_CORE_ADDRESS,
@@ -4950,9 +4953,16 @@ fn get_tokens_for_distribution_returns_initial_value() {
     );
 
     let tokens = ticket_master_dispatcher.get_tokens_for_distribution();
+
     // Should be total supply (registry token not deducted from tokens_for_distribution)
-    let expected = DUNGEON_TICKET_SUPPLY.into();
-    assert_eq!(tokens, expected, "Tokens for distribution should match");
+    let expected = DUNGEON_TICKET_SUPPLY.into() - registry_token_amount;
+    assert_eq!(
+        tokens,
+        expected,
+        "Tokens for distribution should match. Expected: {}, Actual: {}",
+        expected,
+        tokens,
+    );
 }
 
 // ================================
@@ -5515,8 +5525,11 @@ fn distribution_start_succeeds_with_minimal_tokens_for_distribution() {
     start_cheat_caller_address(ticket_master_dispatcher.contract_address, DEPLOYER_ADDRESS);
     let recipient: ContractAddress = 'tiny_recipient'.try_into().unwrap();
     let minimal_distribution = 10_000_000_000_000_000_u128;
-    // Registry token is no longer deducted from tokens_for_distribution
-    let recipient_amount = total_supply - INITIAL_LIQUIDITY_DUNGEON_TICKETS - minimal_distribution;
+    // Registry token (ERC20_UNIT) is deducted from tokens_for_distribution
+    let recipient_amount = total_supply
+        - INITIAL_LIQUIDITY_DUNGEON_TICKETS
+        - minimal_distribution
+        - ERC20_UNIT;
     ticket_master_dispatcher.premint_tokens(array![recipient], array![recipient_amount.into()]);
     stop_cheat_caller_address(ticket_master_dispatcher.contract_address);
 
