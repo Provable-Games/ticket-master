@@ -1,0 +1,21 @@
+[package]
+name = "beast_controller_trial"
+version = "0.1.0"
+edition = "2024_07"
+cairo-version = "=2.15.0"
+
+[dependencies]
+starknet = "=2.15.0"
+openzeppelin_access = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", rev = "ddd3338e787a3fbf4a92b366640a57ee364390cb" }
+openzeppelin_interfaces = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", rev = "ddd3338e787a3fbf4a92b366640a57ee364390cb" }
+openzeppelin_security = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", rev = "ddd3338e787a3fbf4a92b366640a57ee364390cb" }
+
+[dev-dependencies]
+snforge_std = "=0.55.0"
+
+[[target.starknet-contract]]
+sierra = true
+casm = true
+
+[scripts]
+test = "snforge test"

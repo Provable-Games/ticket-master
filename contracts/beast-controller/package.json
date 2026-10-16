@@ -1,0 +1,14 @@
+{
+  "name": "beast-controller-declaration-review",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "verify:release": "node verify-release.cjs"
+  },
+  "dependencies": {
+    "starknet": "10.8.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

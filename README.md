@@ -1,5 +1,8 @@
 # TicketMaster
 
+The separate Beast Mode position controller and its declaration review artifacts
+are documented in [contracts/beast-controller](contracts/beast-controller/README.md).
+
 TicketMaster leverages Ekubo's TWAMM extension to deliver demand-based, market-rate pricing for Dungeon Tickets. Built as an extension to OpenZeppelin's
 ERC20 component, this system provides a stateful flow that automates TWAMM pool initialization, order creation, and distribution of proceeds. The contract
 monitors Ekubo's on-chain oracle price feed over a configurable lookback period and can temporarily throttle issuance when the market trades below a
