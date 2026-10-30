@@ -1,0 +1,53 @@
+{
+  "addresses": {
+    "ticket": "0x0452810188c4cb3aebd63711a3b445755bc0d6c4f27b923fdd99b1a118858136",
+    "owner": "0x0248f76e72088853c3fe96cad8f7f075c9e514b862a6e9a3d5957ea5522ebb6d",
+    "lords": "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+    "survivor": "0x042dd777885ad2c116be96d4d634abc90a26a790ffb5871e037dd5ae7d2ec86b",
+    "dao": "0x041bb7729efa185f2cab327de0a668886302f1d4969e3edf504c4741648f858b",
+    "velords": "0x045c587318c9ebcf2fbe21febf288ee2e3597a21cd48676005a5770a50d433c5",
+    "positions": "0x02e0af29598b407c8716b17f6d2795eca1b471413fa03fb145a5e33722184067",
+    "nft": "0x07b696af58c967c1b14c9dde0ace001720635a660a8e90c565ea459345318b30",
+    "core": "0x00000005dd3d2f4429af886cd1a3b08289dbcea99a294197e9eb43b0e0325b4b",
+    "router": "0x0199741822c2dc722f6f605204f35e56dbc23bceed54818168c4c49e4fb8737e",
+    "extension": "0x043e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc"
+  },
+  "classes": {
+    "ticket": "0x5c668438529906abdd5f04cbe44c9919c40a811f922cbdc59630f3116c0fd8f",
+    "positions": "0x6a3ba97c623a9e6abeffa5db5726f68ba5cec842de80922b8825effe68d21d",
+    "core": "0x423df19e032f2d9bf9bb5bc1ea96db2b06d4c752c8c130cba7d577eed1de20a",
+    "nft": "0x509c0b913cd309048269018617a20eef51d9cd42397416be9b212169637f4e4",
+    "router": "0x137a5970f752fd80649fb38d684b090decebec4f2853396617e4f2f01e5396a",
+    "extension": "0x7f60fe1d7e48bb51695f675de0475325d2d131a81fc87144023ae437fcfac32",
+    "owner": "0x6e150953b26271a740bf2b6e9bca17cc52c68d765f761295de51ceb8526ee72"
+  },
+  "getters": {
+    "get_distribution_pool_key": [
+      "0x124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+      "0x452810188c4cb3aebd63711a3b445755bc0d6c4f27b923fdd99b1a118858136",
+      "0x0",
+      "0x56a4c",
+      "0x43e4f09c32d13d43a880e85f69f7de93ceda62d6cf2581a582c6db635548fdc"
+    ],
+    "get_distribution_order_key": [
+      "0x452810188c4cb3aebd63711a3b445755bc0d6c4f27b923fdd99b1a118858136",
+      "0x124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+      "0x0",
+      "0x0",
+      "0x160000000"
+    ],
+    "get_position_token_id": [
+      "0x2250e9"
+    ],
+    "get_liquidity_position_id": [
+      "0x2250e3"
+    ],
+    "get_distribution_initial_tick": [
+      "0x346605",
+      "0x1"
+    ],
+    "get_token_distribution_rate": [
+      "0x2ad909c264a70183601165"
+    ]
+  }
+}

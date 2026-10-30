@@ -1,0 +1,25 @@
+{
+  "name": "beast-mode-restart",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Read-only mainnet inspection and local fork rehearsal for the original Beast Mode ticket sale",
+  "scripts": {
+    "inspect": "node restart.cjs inspect",
+    "rehearse": "node restart.cjs rehearse",
+    "test": "node --test restart.test.cjs web/protocol.test.mjs",
+    "build:web": "node build-web.cjs",
+    "preview:web": "node serve-web.cjs",
+    "start": "npm run build:web && node serve-web.cjs",
+    "rehearse:rollback": "node rollback.cjs",
+    "rehearse:controller": "node controller-rehearsal.cjs"
+  },
+  "dependencies": {
+    "starknet": "10.8.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

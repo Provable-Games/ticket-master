@@ -1,0 +1,4 @@
+node_modules/
+
+# Keep this prototype; the workspace ignores unrelated cloned controller repos.
+!/controller/
